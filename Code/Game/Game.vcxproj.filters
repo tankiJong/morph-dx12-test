@@ -11,6 +11,9 @@
     <Filter Include="Assets\Shaders">
       <UniqueIdentifier>{1f1df2c0-e554-4eb3-84e5-89151213bd3c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="dx12">
+      <UniqueIdentifier>{f4ecabd1-a078-4fa9-9bdb-6102c67e2c6d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main_Win32.cpp">
@@ -18,6 +21,27 @@
     </ClCompile>
     <ClCompile Include="GameCommon.cpp">
       <Filter>General</Filter>
+    </ClCompile>
+    <ClCompile Include="dx12\Dx12Device.cpp">
+      <Filter>dx12</Filter>
+    </ClCompile>
+    <ClCompile Include="dx12\Dx12Instance.cpp">
+      <Filter>dx12</Filter>
+    </ClCompile>
+    <ClCompile Include="Main.cpp">
+      <Filter>General</Filter>
+    </ClCompile>
+    <ClCompile Include="dx12\Dx12Output.cpp">
+      <Filter>dx12</Filter>
+    </ClCompile>
+    <ClCompile Include="dx12\Dx12CommandList.cpp">
+      <Filter>dx12</Filter>
+    </ClCompile>
+    <ClCompile Include="dx12\RootSignature.cpp">
+      <Filter>dx12</Filter>
+    </ClCompile>
+    <ClCompile Include="dx12\dx12util.cpp">
+      <Filter>dx12</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -28,8 +52,26 @@
       <Filter>General</Filter>
     </ClInclude>
     <ClInclude Include="EngineBuildPreferences.hpp" />
-    <ClInclude Include="d3d12.h">
-      <Filter>General</Filter>
+    <ClInclude Include="dx12\Dx12Device.hpp">
+      <Filter>dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="dx12\Dx12Instance.hpp">
+      <Filter>dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="dx12\d3d12.h">
+      <Filter>dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="dx12\dx12util.hpp">
+      <Filter>dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="dx12\Dx12Output.hpp">
+      <Filter>dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="dx12\Dx12CommandList.hpp">
+      <Filter>dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="dx12\RootSignature.hpp">
+      <Filter>dx12</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

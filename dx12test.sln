@@ -9,6 +9,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Engine", "..\..\Engine\Code
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug_DX12|x64 = Debug_DX12|x64
+		Debug_DX12|x86 = Debug_DX12|x86
 		Debug|x64 = Debug|x64
 		Debug|x86 = Debug|x86
 		DebugInline|x64 = DebugInline|x64
@@ -19,6 +21,10 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F5B89BA1-9CB4-4235-8847-2E90C319E500}.Debug_DX12|x64.ActiveCfg = DebugInline|x64
+		{F5B89BA1-9CB4-4235-8847-2E90C319E500}.Debug_DX12|x64.Build.0 = DebugInline|x64
+		{F5B89BA1-9CB4-4235-8847-2E90C319E500}.Debug_DX12|x86.ActiveCfg = Debug|Win32
+		{F5B89BA1-9CB4-4235-8847-2E90C319E500}.Debug_DX12|x86.Build.0 = Debug|Win32
 		{F5B89BA1-9CB4-4235-8847-2E90C319E500}.Debug|x64.ActiveCfg = Debug|x64
 		{F5B89BA1-9CB4-4235-8847-2E90C319E500}.Debug|x64.Build.0 = Debug|x64
 		{F5B89BA1-9CB4-4235-8847-2E90C319E500}.Debug|x86.ActiveCfg = Debug|Win32
@@ -35,6 +41,10 @@ Global
 		{F5B89BA1-9CB4-4235-8847-2E90C319E500}.Release|x64.Build.0 = Release|x64
 		{F5B89BA1-9CB4-4235-8847-2E90C319E500}.Release|x86.ActiveCfg = Release|Win32
 		{F5B89BA1-9CB4-4235-8847-2E90C319E500}.Release|x86.Build.0 = Release|Win32
+		{F98FC404-61CF-431F-A434-4C724EF1EC69}.Debug_DX12|x64.ActiveCfg = Debug_DX12|x64
+		{F98FC404-61CF-431F-A434-4C724EF1EC69}.Debug_DX12|x64.Build.0 = Debug_DX12|x64
+		{F98FC404-61CF-431F-A434-4C724EF1EC69}.Debug_DX12|x86.ActiveCfg = Debug_DX12|Win32
+		{F98FC404-61CF-431F-A434-4C724EF1EC69}.Debug_DX12|x86.Build.0 = Debug_DX12|Win32
 		{F98FC404-61CF-431F-A434-4C724EF1EC69}.Debug|x64.ActiveCfg = Debug|x64
 		{F98FC404-61CF-431F-A434-4C724EF1EC69}.Debug|x64.Build.0 = Debug|x64
 		{F98FC404-61CF-431F-A434-4C724EF1EC69}.Debug|x86.ActiveCfg = Debug|Win32

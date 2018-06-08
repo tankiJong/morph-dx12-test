@@ -1,7 +1,7 @@
 #define WIN32_LEAN_AND_MEAN		// Always #define this before #including <windows.h>
 #include <Windows.h>
 
-#include "d3d12.h"
+#include "dx12/d3d12.h"
 #include <dxgi1_4.h>
 #include <d3dcompiler.h>
 
@@ -401,7 +401,6 @@ void loadAsset() {
   fs::path shaderPath = fs::absolute("shaders.hlsl");
   breakOnFail(D3DCompileFromFile(shaderPath.c_str(), nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, nullptr));
   breakOnFail(D3DCompileFromFile(shaderPath.c_str(), nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, nullptr));
-
   // create vertex input layout
   D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
   {
@@ -741,7 +740,7 @@ void RunFrame() {
 }
 
 //-----------------------------------------------------------------------------------------------
-int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR commandLineString, int) {
+int __stdcall _WinMain(HINSTANCE, HINSTANCE, LPSTR commandLineString, int) {
 	UNUSED(commandLineString);
 	Initialize();
 
