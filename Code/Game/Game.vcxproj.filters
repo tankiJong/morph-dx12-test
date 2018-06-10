@@ -43,6 +43,9 @@
     <ClCompile Include="dx12\dx12util.cpp">
       <Filter>dx12</Filter>
     </ClCompile>
+    <ClCompile Include="dx12\PipelineState.cpp">
+      <Filter>dx12</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\..\ReadMe.txt" />
@@ -71,6 +74,9 @@
       <Filter>dx12</Filter>
     </ClInclude>
     <ClInclude Include="dx12\RootSignature.hpp">
+      <Filter>dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="dx12\PipelineState.hpp">
       <Filter>dx12</Filter>
     </ClInclude>
   </ItemGroup>

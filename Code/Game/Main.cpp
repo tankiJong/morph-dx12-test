@@ -42,21 +42,25 @@ void Initialize() {
 void RunFrame() {
   mContext->beginFrame();
 
-  vertex_pc_t triangleVertices1[] =
-  {
-    { { 0.0f, 0.25f, 0.0f },{ 1.0f, 0.0f, 0.0f, 1.0f } },
-  { { 0.25f, -0.25f, 0.0f },{ 0.0f, 1.0f, 0.0f, 1.0f } },
-  { { 0.f, -0.25f, 0.0f },{ 0.0f, 0.0f, 1.0f, 1.0f } }
-  };
+  // vertex_pc_t triangleVertices1[] =
+  // {
+  //   { { 0.0f, 0.25f, 0.0f },{ 1.0f, 0.0f, 0.0f, 1.0f } },
+  // { { 0.25f, -0.25f, 0.0f },{ 0.0f, 1.0f, 0.0f, 1.0f } },
+  // { { 0.f, -0.25f, 0.0f },{ 0.0f, 0.0f, 1.0f, 1.0f } }
+  // };
+  //
+  // vertex_pc_t triangleVertices2[] =
+  // {
+  //   { { 0.0f, 0.25f, 0.0f },{ 1.0f, 0.0f, 1.0f, 1.0f } },
+  // { { 0.f, -0.25f, 0.0f },{ 1.0f, 1.0f, 0.0f, 1.0f } },
+  // { { -0.25f, -0.25f, 0.0f },{ 0.0f, 1.0f, 1.0f, 1.0f } }
+  // };
+  // mContext->drawVertexArray(triangleVertices1);
+  // mContext->drawVertexArray(triangleVertices2);
 
-  vertex_pc_t triangleVertices2[] =
-  {
-    { { 0.0f, 0.25f, 0.0f },{ 1.0f, 0.0f, 1.0f, 1.0f } },
-  { { 0.f, -0.25f, 0.0f },{ 1.0f, 1.0f, 0.0f, 1.0f } },
-  { { -0.25f, -0.25f, 0.0f },{ 0.0f, 1.0f, 1.0f, 1.0f } }
-  };
-  mContext->drawVertexArray(triangleVertices1);
-  mContext->drawVertexArray(triangleVertices2);
+  vertex_pcu_t verts[1];
+
+  mContext->drawVertexArray(verts);
 
   TODO("rename to dispatchCommandList()")
   mContext->afterFrame();

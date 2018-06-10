@@ -7,9 +7,11 @@
 #include "Engine/File/Path.hpp"
 #include "Engine/File/Utils.hpp"
 #include "Game/dx12/RootSignature.hpp"
+#include "Game/dx12/PipelineState.hpp"
+#include "Engine/Renderer/Geometry/Mesh.hpp"
 
 void Dx12CommandList::beginFrame() {
-  mCommandList->Reset(mCommandAllocator.get(), mPipelineState.get());
+  mCommandList->Reset(mCommandAllocator.get(), (ID3D12PipelineState*)mPipelineState->native());
   mCommandList->SetGraphicsRootSignature((ID3D12RootSignature*)mRootSignature->native());
 
   // possibly should already been setup somewhere else
@@ -42,9 +44,43 @@ void Dx12CommandList::beginFrame() {
 
 }
 
-void Dx12CommandList::drawVertexArray(span<vertex_pc_t> verts) {
-  mCommandList->Reset(mCommandAllocator.get(), mPipelineState.get());
+void Dx12CommandList::drawVertexArray(span<vertex_pcu_t>) {
+
+  uint numVerts = 3;
+
+  vec3 pos[3] = {
+    { 0.0f, 0.25f, 0.0f },
+    { 0.25f, -0.25f, 0.0f },
+    { 0.f, -0.25f, 0.0f }
+  };
+  Rgba color[3] = {
+    Rgba::red,
+    Rgba::green,
+    Rgba::blue,
+  };
+
+  vec2 uvs[3] = {
+    vec2::right,
+    vec2::zero,
+    vec2::top
+  };
+
+  byte_t* verts[3] = {
+    (byte_t*)pos,
+    (byte_t*)color,
+    (byte_t*)uvs,
+  };
+
+  uint stride[3] = { sizeof(vec3), sizeof(Rgba), sizeof(vec2) };
+
+  DXGI_FORMAT formats[3] = { DXGI_FORMAT_R32G32B32_FLOAT, DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_R32G32_FLOAT };
+
+  mPipelineState->setInputLayout(*VertexLayout::For<vertex_pcu_t>());
+  mPipelineState->finalize();
+  mCommandList->Reset(mCommandAllocator.get(), nullptr);
   mCommandList->SetGraphicsRootSignature((ID3D12RootSignature*)mRootSignature->native());
+  mCommandList->SetPipelineState((ID3D12PipelineState*)mPipelineState->native());
+  // mCommandList->Reset(mCommandAllocator.get(), (ID3D12PipelineState*)mPipelineState->native());
 
   // possibly should already been setup somewhere else
   //ID3D12DescriptorHeap* ppHeaps[] = { mSrvHeap.get() };
@@ -71,53 +107,56 @@ void Dx12CommandList::drawVertexArray(span<vertex_pc_t> verts) {
   auto rtvhandle = mDevice->getRtvHandle();
   mCommandList->OMSetRenderTargets(1, &rtvhandle, FALSE, nullptr);
   ID3D12Device* nativeDevice = (ID3D12Device*)mDevice->nativeDevice();
-  const UINT vertexBufferSize = sizeof(vertex_pc_t) * verts.size();
+
+  // set up vertex buffer stream
+  ID3D12Resource* vertexBuffer[3];
   D3D12_HEAP_PROPERTIES heapProp;
   heapProp.Type = D3D12_HEAP_TYPE_UPLOAD;
   heapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
   heapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
   heapProp.CreationNodeMask = 1;
   heapProp.VisibleNodeMask = 1;
-
-  D3D12_RESOURCE_DESC resourceDesc;
-  resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-  resourceDesc.Alignment = 0;
-  resourceDesc.Width = vertexBufferSize;
-  resourceDesc.Height = 1;
-  resourceDesc.DepthOrArraySize = 1;
-  resourceDesc.MipLevels = 1;
-  resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
-  resourceDesc.SampleDesc.Count = 1;
-  resourceDesc.SampleDesc.Quality = 0;
-  resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-  resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-  ID3D12Resource* vertexBuffer;
+  D3D12_VERTEX_BUFFER_VIEW vertexBufferView[3];
+  for(uint i = 0; i<3; ++i) {
+    D3D12_RESOURCE_DESC resourceDesc;
+    resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    resourceDesc.Alignment = 0;
+    resourceDesc.Width = numVerts * stride[i];
+    resourceDesc.Height = 1;
+    resourceDesc.DepthOrArraySize = 1;
+    resourceDesc.MipLevels = 1;
+    resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
+    resourceDesc.SampleDesc.Count = 1;
+    resourceDesc.SampleDesc.Quality = 0;
+    resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+    
   breakOnFail(nativeDevice->CreateCommittedResource(
     &heapProp,
     D3D12_HEAP_FLAG_NONE,
     &resourceDesc,
     D3D12_RESOURCE_STATE_GENERIC_READ,
     nullptr,
-    IID_PPV_ARGS(&vertexBuffer)));
+    IID_PPV_ARGS(&vertexBuffer[i])));
 
-  // Copy the triangle data to the vertex buffer.
-  UINT8* pVertexDataBegin;
-  D3D12_RANGE readRange;
-  readRange.Begin = 0;
-  readRange.End = 0;  // We do not intend to read from this resource on the CPU.
-  breakOnFail(vertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)));
-  memcpy(pVertexDataBegin, verts.data(), vertexBufferSize);
-  vertexBuffer->Unmap(0, nullptr);
+    // Copy the triangle data to the vertex buffer.
+    UINT8* pVertexDataBegin;
+    D3D12_RANGE readRange;
+    readRange.Begin = 0;
+    readRange.End = 0;  // We do not intend to read from this resource on the CPU.
+    breakOnFail(vertexBuffer[i]->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)));
+    memcpy(pVertexDataBegin, (void*)verts[i], numVerts * stride[i]);
+    vertexBuffer[i]->Unmap(0, nullptr);
 
-  D3D12_VERTEX_BUFFER_VIEW vertexBufferView;
-  // Initialize the vertex buffer view.
-  vertexBufferView.BufferLocation = vertexBuffer->GetGPUVirtualAddress();
-  vertexBufferView.StrideInBytes = sizeof(vertex_pc_t);
-  vertexBufferView.SizeInBytes = vertexBufferSize;
+    // Initialize the vertex buffer view.
+    vertexBufferView[i].BufferLocation = vertexBuffer[i]->GetGPUVirtualAddress();
+    vertexBufferView[i].StrideInBytes = stride[i];
+    vertexBufferView[i].SizeInBytes = stride[i] * numVerts;
+    mCommandList->IASetVertexBuffers(i, 1, &vertexBufferView[i]);
+  }
+
 
   mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-  mCommandList->IASetVertexBuffers(0, 1, &vertexBufferView);
   mCommandList->DrawInstanced(3, 1, 0, 0);
 
   mCommandList->Close();
@@ -213,81 +252,8 @@ Dx12CommandList::Dx12CommandList(S<Dx12Device> device)
   * create pipeline state
   *
   ****************************************/
-#if defined(_DEBUG)
-  // Enable better shader debugging with the graphics debugging tools.
-  UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
-#else
-  UINT compileFlags = 0;
-#endif
-
-  ID3DBlob* vertexShader = nullptr;
-  ID3DBlob* pixelShader = nullptr;
-
-  fs::path shaderPath = fs::absolute("shaders.hlsl");
-  breakOnFail(D3DCompileFromFile(shaderPath.c_str(), nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, nullptr));
-  breakOnFail(D3DCompileFromFile(shaderPath.c_str(), nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, nullptr));
-  // create vertex input layout
-  D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
-  {
-    { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-    { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
-  };
-
-  // Describe and create the graphics pipeline state object (PSO).
-  D3D12_SHADER_BYTECODE VS, PS;
-  VS.pShaderBytecode = vertexShader->GetBufferPointer();
-  VS.BytecodeLength = vertexShader->GetBufferSize();
-  PS.pShaderBytecode = pixelShader->GetBufferPointer();
-  PS.BytecodeLength = pixelShader->GetBufferSize();
-
-  // default rasterizer
-  D3D12_RASTERIZER_DESC rasterizerDesc;
-  rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
-  rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
-  rasterizerDesc.FrontCounterClockwise = FALSE;
-  rasterizerDesc.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
-  rasterizerDesc.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
-  rasterizerDesc.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
-  rasterizerDesc.DepthClipEnable = TRUE;
-  rasterizerDesc.MultisampleEnable = FALSE;
-  rasterizerDesc.AntialiasedLineEnable = FALSE;
-  rasterizerDesc.ForcedSampleCount = 0;
-  rasterizerDesc.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
-
-  // default Blend
-  D3D12_BLEND_DESC blendDesc;
-  blendDesc.AlphaToCoverageEnable = FALSE;
-  blendDesc.IndependentBlendEnable = FALSE;
-  const D3D12_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc =
-  {
-    FALSE,FALSE,
-    D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-    D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-    D3D12_LOGIC_OP_NOOP,
-    D3D12_COLOR_WRITE_ENABLE_ALL,
-  };
-  for (UINT i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
-    blendDesc.RenderTarget[i] = defaultRenderTargetBlendDesc;
-
-  // set up pso
-  D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-  psoDesc.InputLayout = { inputElementDescs, countof(inputElementDescs) };
-  psoDesc.pRootSignature = (ID3D12RootSignature*)mRootSignature->native();
-  psoDesc.VS = VS;
-  psoDesc.PS = PS;
-  psoDesc.RasterizerState = rasterizerDesc;
-  psoDesc.BlendState = blendDesc;
-  psoDesc.DepthStencilState.DepthEnable = FALSE;
-  psoDesc.DepthStencilState.StencilEnable = FALSE;
-  psoDesc.SampleMask = UINT_MAX;
-  psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-  psoDesc.NumRenderTargets = 1;
-  psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-  psoDesc.SampleDesc.Count = 1;
-
-  ID3D12PipelineState* ps = (ID3D12PipelineState*)mPipelineState.get();
-  breakOnFail(nativeDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&ps)));
-  mPipelineState.reset(ps);
+  mPipelineState.reset(new PipelineState(mDevice));
+  mPipelineState->setRootSignature(mRootSignature);
 
   /****************************************
   *
@@ -300,7 +266,7 @@ Dx12CommandList::Dx12CommandList(S<Dx12Device> device)
   mCommandAllocator.reset(ca);
 
   ID3D12GraphicsCommandList* cl = mCommandList.get();
-  breakOnFail(nativeDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, mCommandAllocator.get(), mPipelineState.get(), IID_PPV_ARGS(&cl)));
+  breakOnFail(nativeDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, mCommandAllocator.get(), (ID3D12PipelineState*)mPipelineState->native(), IID_PPV_ARGS(&cl)));
   mCommandList.reset(cl);
   mCommandList->Close();
 
@@ -311,7 +277,7 @@ Dx12CommandList::Dx12CommandList(S<Dx12Device> device)
 }
 
 void Dx12CommandList::waitForPreviousFrame() {
-   mDevice->waitForFence(mFenceValue);
+   // mDevice->waitForFence(mFenceValue);
 
    //  WAITING FOR THE FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
    //  This is code implemented as such for simplicity. The D3D12HelloFrameBuffering

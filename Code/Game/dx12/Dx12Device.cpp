@@ -20,13 +20,13 @@ S<Dx12Output> Dx12Device::getOutput() {
 u64 Dx12Device::dispatchCommandList(Dx12CommandList& context) {
 
   std::lock_guard<std::mutex> mGuard(mEventMutex);
-  HRESULT r = context.mCommandList->Close();
+  // HRESULT r = context.mCommandList->Close();
   //EXPECT_HR_SUCCESSED(context.mCommandList->Close());
 
   ID3D12CommandList* ppCommandLists[] = { context.mCommandList.get() };
   mCommandQueue->ExecuteCommandLists(countof(ppCommandLists), ppCommandLists);
 
-  mCommandQueue->Signal(mFence.get(), mNextFenceValue);
+  // mCommandQueue->Signal(mFence.get(), mNextFenceValue);
 
   return mNextFenceValue++;
 }
