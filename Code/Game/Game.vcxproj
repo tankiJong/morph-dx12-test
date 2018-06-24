@@ -183,7 +183,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MORPH_D3D12;WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>$(SolutionDir)../../Engine/Code/;$(SolutionDir)../../Engine/Code/ThirdParty/;$(SolutionDir)Code/</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -237,7 +237,7 @@ exit/B %errlev%</Command>
       </PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MORPH_D3D12;WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>$(SolutionDir)../../Engine/Code/;$(SolutionDir)../../Engine/Code/ThirdParty/;$(SolutionDir)Code/</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -291,7 +291,7 @@ exit/B %errlev%</Command>
       </PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MORPH_D3D12;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>$(SolutionDir)../../Engine/Code/;$(SolutionDir)../../Engine/Code/ThirdParty/;$(SolutionDir)Code/</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -343,7 +343,7 @@ exit/B %errlev%</Command>
       </PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MORPH_D3D12;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>$(SolutionDir)../../Engine/Code/;$(SolutionDir)../../Engine/Code/ThirdParty/;$(SolutionDir)Code/</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -399,7 +399,7 @@ exit/B %errlev%</Command>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MORPH_D3D12;WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>$(SolutionDir)../../Engine/Code/;$(SolutionDir)../../Engine/Code/ThirdParty/;$(SolutionDir)Code/</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -454,7 +454,7 @@ exit/B %errlev%</Command>
       <Optimization>Disabled</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MORPH_D3D12;WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>$(SolutionDir)../../Engine/Code/;$(SolutionDir)../../Engine/Code/ThirdParty/;$(SolutionDir)Code/</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -509,7 +509,7 @@ exit/B %errlev%</Command>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MORPH_D3D12;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>$(SolutionDir)../../Engine/Code/;$(SolutionDir)../../Engine/Code/ThirdParty/;$(SolutionDir)Code/</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -564,7 +564,7 @@ exit/B %errlev%</Command>
       <Optimization>Disabled</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MORPH_D3D12;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>$(SolutionDir)../../Engine/Code/;$(SolutionDir)../../Engine/Code/ThirdParty/;$(SolutionDir)Code/</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -612,13 +612,34 @@ exit/B %errlev%</Command>
     </CustomBuild>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="dx12\Dx12CommandList.cpp" />
-    <ClCompile Include="dx12\Dx12Device.cpp" />
-    <ClCompile Include="dx12\Dx12Instance.cpp" />
-    <ClCompile Include="dx12\Dx12Output.cpp" />
-    <ClCompile Include="dx12\dx12util.cpp" />
-    <ClCompile Include="dx12\PipelineState.cpp" />
-    <ClCompile Include="dx12\RootSignature.cpp" />
+    <ClCompile Include="dx12\Dx12CommandList.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="dx12\Dx12Device.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="dx12\Dx12Instance.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="dx12\Dx12Output.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="dx12\dx12util.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="dx12\PipelineState.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="dx12\RootSignature.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="GameCommon.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Main_Win32.cpp">
@@ -641,14 +662,38 @@ exit/B %errlev%</Command>
     <Text Include="..\..\ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="dx12\d3d12.h" />
-    <ClInclude Include="dx12\Dx12CommandList.hpp" />
-    <ClInclude Include="dx12\Dx12Device.hpp" />
-    <ClInclude Include="dx12\Dx12Instance.hpp" />
-    <ClInclude Include="dx12\Dx12Output.hpp" />
-    <ClInclude Include="dx12\dx12util.hpp" />
-    <ClInclude Include="dx12\PipelineState.hpp" />
-    <ClInclude Include="dx12\RootSignature.hpp" />
+    <ClInclude Include="dx12\d3d12.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="dx12\Dx12CommandList.hpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="dx12\Dx12Device.hpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="dx12\Dx12Instance.hpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="dx12\Dx12Output.hpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="dx12\dx12util.hpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="dx12\PipelineState.hpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="dx12\RootSignature.hpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugInline|x64'">true</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="EngineBuildPreferences.hpp" />
     <ClInclude Include="GameCommon.hpp" />
   </ItemGroup>

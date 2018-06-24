@@ -21,7 +21,9 @@ public:
   bool isFenceComplete(u64 fenceValue);
   void waitForFence(u64 fenceValue);
   u64 increaseFence();
+
   D3D12_CPU_DESCRIPTOR_HANDLE getRtvHandle();
+
 protected:
   Dx12Device(Dx12Instance* instance, ID3D12Device* device);
   void initOutput();

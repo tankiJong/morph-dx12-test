@@ -3,6 +3,10 @@
 #include <locale.h> 
 #include "Engine/Debug/ErrorWarningAssert.hpp"
 
+#pragma comment(lib, "d3dcompiler.lib")
+#pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "d3d12.lib")
+
 void breakOnFail(HRESULT hr) {
   if(FAILED(hr)) {
     __debugbreak();
