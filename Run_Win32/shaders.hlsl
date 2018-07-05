@@ -9,6 +9,10 @@
 //
 //*********************************************************
 
+cbuffer Tint : register(b0) {
+  float4 cTintColor;
+};
+
 struct PSInput {
   float4 position : SV_POSITION;
   float4 color : COLOR;
@@ -29,5 +33,5 @@ PSInput VSMain(float3 position : POSITION, float4 color : COLOR, float2 uv: UV) 
 
 float4 PSMain(PSInput input) : SV_TARGET
 {
-  return g_texture.Sample(g_sampler, input.uv);
+  return g_texture.Sample(g_sampler, input.uv) * cTintColor;
 }

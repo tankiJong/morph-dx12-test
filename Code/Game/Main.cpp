@@ -9,6 +9,9 @@
 #include "Engine/Graphics/RHI/RootSignature.hpp"
 #include "Engine/Graphics/RHI/PipelineState.hpp"
 #include "Engine/Graphics/RHI/RHITexture.hpp"
+#include "Engine/Graphics/RHI/ResourceView.hpp"
+#include "Engine/Core/Time/Clock.hpp"
+#include "Engine/Graphics/RHI/Texture.hpp"
 #define UNUSED(x) (void)x
 
 // -------------------------  constant ------------------------------
@@ -59,7 +62,11 @@ PipelineState::sptr_t pipelineState;
 RootSignature::sptr_t rootSig;
 
 RHIBuffer::sptr_t vbo[3];
-RHITexture::sptr_t texture;
+RHIBuffer::sptr_t cTint;
+Texture2::sptr_t texture;
+ConstantBufferView::sptr_t tintCbv;
+ShaderResourceView::sptr_t texSrv;
+DescriptorSet::sptr_t descriptorSet;
 void Initialize() {
   mDevice = RHIDevice::create();
 
@@ -68,7 +75,9 @@ void Initialize() {
   {
     RootSignature::Desc desc;
     RootSignature::desc_set_layout_t layout;
+    layout.addRange(DescriptorSet::Type::Cbv, 0, 1, 0);
     layout.addRange(DescriptorSet::Type::TextureSrv, 0, 1, 0);
+    descriptorSet = DescriptorSet::create(mDevice->gpuDescriptorPool(), layout);
     desc.addDescriptorSet(layout);
     rootSig = RootSignature::create(desc);
   }
@@ -81,6 +90,7 @@ void Initialize() {
 
     mContext->setPipelineState(pipelineState);
   }
+
 
   // mContext->flush();
 
@@ -125,19 +135,32 @@ void Initialize() {
   vbo[2] =
   RHIBuffer::create(sizeof(vec2) * numVerts, RHIResource::BindingFlag::VertexBuffer, RHIBuffer::CPUAccess::Write, uvs);
 
+  vec4 tint = vec4(0.5f, .5f, .5f, 1.f);
+  cTint = RHIBuffer::create(sizeof(vec4), RHIResource::BindingFlag::ConstantBuffer, RHIBuffer::CPUAccess::Write, &tint);
+  //
   std::vector<UINT8> data = GenerateTextureData();
-  texture = RHITexture::create2D(texWidth, texHeight, data.data(), data.size());
-  mContext->resourceBarrier(texture.get(), RHIResource::State::ShaderResource);
+  texture = Texture2::create(texWidth, texHeight, RHIResource::BindingFlag::ShaderResource, data.data(), data.size());
 
+  tintCbv = ConstantBufferView::create(cTint);
+  texSrv = ShaderResourceView::create(texture, 0, 1, 0, 1);
+  descriptorSet->setCbv(0, 0, *tintCbv);
+  descriptorSet->setSrv(0, 1, *texSrv);
+  mContext->resourceBarrier(texture.get(), RHIResource::State::ShaderResource);
   mContext->flush();
 }
 
 void RunFrame() {
+  static float a = 1.f;
+  a += 1.f;
+  a = fmod(a, 360.f);
   static uint frame   = 10;
   static uint current = 0;
   mContext->beforeFrame();
+  vec4 color = Hsl(a, 1.f, .5f).normalized();
+  mContext->updateBuffer(cTint.get(), &color, 0, sizeof(vec4));
   mContext->setPipelineState(pipelineState);
   mContext->bindDescriptorHeap();
+  descriptorSet->bindForGraphics(*mContext, *rootSig, 0);
 
   uint stride[3] = {sizeof(vec3), sizeof(Rgba), sizeof(vec2)};
   for(int i = 0; i < 3; i++) {
@@ -148,7 +171,6 @@ void RunFrame() {
   // mContext->draw(3, 3);
   mContext->afterFrame();
   mDevice->present();
-  TODO("rename to dispatchCommandList()")
 }
 
 //-----------------------------------------------------------------------------------------------
