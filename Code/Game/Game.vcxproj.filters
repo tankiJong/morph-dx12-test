@@ -82,8 +82,6 @@
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="shaders.hlsl" />
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="matrix.hlsl" />
+    <CustomBuild Include="ssao.hlsl" />
   </ItemGroup>
 </Project>

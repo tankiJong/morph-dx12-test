@@ -703,7 +703,7 @@ exit/B %errlev%</Command>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="matrix.hlsl">
+    <CustomBuild Include="ssao.hlsl">
       <FileType>Document</FileType>
     </CustomBuild>
   </ItemGroup>

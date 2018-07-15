@@ -1,13 +1,4 @@
-//*********************************************************
-//
-// Copyright (c) Microsoft. All rights reserved.
-// This code is licensed under the MIT License (MIT).
-// THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY
-// IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR
-// PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
-//
-//*********************************************************
+
 #ifndef __MATRIX_INCLUDED__
 #define __MATRIX_INCLUDED__
 // https://gist.github.com/mattatz/86fff4b32d198d0928d0fa4ff32cf6fa
@@ -162,7 +153,7 @@ float3 PhongLighting(float3 surfacePosition, float3 surfaceNormal, float3 surfac
 {
 	const float SPECULAR_AMOUNT = 5.f;
 	const float SPECULAR_POWER = 3.f;
-  float3 ambient = .3f;
+  float3 ambient = .5f;
   float3 diffuse = Diffuse(surfacePosition, surfaceNormal, surfaceColor, light);
   float3 specular = Specular(surfacePosition, surfaceNormal, 
 														 normalize(eyePosition - surfacePosition), SPECULAR_AMOUNT, SPECULAR_POWER, light);
@@ -172,11 +163,19 @@ float3 PhongLighting(float3 surfacePosition, float3 surfaceNormal, float3 surfac
   return clamp(color, float3(0.f, 0.f, 0.f), float3(1.f, 1.f, 1.f));
 }
 
+struct PSOutput {
+	float4 color: SV_TARGET0;
+	float4 normal: SV_TARGET1;
+};
 
-float4 PSMain(PSInput input) : SV_TARGET
-{	
-	//float4 texColor = gTexDiffuse.Sample(g_sampler, input.uv);
-	float4 texColor = input.color;
-  return float4(
+PSOutput PSMain(PSInput input) : SV_TARGET
+{
+	PSOutput output;
+	float4 texColor = input.color * gTexDiffuse.Sample(g_sampler, input.uv);
+	// float4 texColor = input.color;
+  output.color = float4(
 		PhongLighting(input.worldPosition, input.normal, texColor.xyz, input.eyePosition), 1.f);
+	output.normal = float4(input.normal * .5f + .5f, 1.f);
+
+	return output;
 }
