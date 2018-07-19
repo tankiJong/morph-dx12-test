@@ -41,10 +41,10 @@ constexpr uint texWidth = 256;
 constexpr uint texHeight = 256;
 // Generate a simple black and white checkerboard texture.
 std::vector<UINT8> GenerateTextureData() {
-  const UINT rowPitch = texWidth * texHeight;
+  const UINT rowPitch = texWidth * 4;
   const UINT cellPitch = rowPitch >> 3;		// The width of a cell in the checkboard texture.
   const UINT cellHeight = texHeight >> 3;	// The height of a cell in the checkerboard texture.
-  const UINT textureSize = rowPitch * 256;
+  const UINT textureSize = rowPitch * texHeight;
 
   std::vector<UINT8> data(textureSize);
   UINT8* pData = &data[0];
@@ -56,19 +56,36 @@ std::vector<UINT8> GenerateTextureData() {
     UINT j = y / cellHeight;
 
     if (i % 2 == j % 2) {
-      pData[n] =     0x00;		// R
-      pData[n + 1] = 0x00;	// G
-      pData[n + 2] = 0xff;	// B
+      pData[n] =     0xff;		// R
+      pData[n + 1] = 0xff;	// G
+      pData[n + 2] = 0x00;	// B
       pData[n + 3] = 0xff;	// A
     } else {
       pData[n] =     0xff;		// R
       pData[n + 1] = 0x00;	// G
-      pData[n + 2] = 0xff;	// B
+      pData[n + 2] = 0x00;	// B
       pData[n + 3] = 0xff;	// A
     }
   }
 
   return data;
+}
+
+std::vector<Rgba> genNoise(uint width, uint height) {
+  std::vector<Rgba> noise;
+  noise.resize(width * height);
+
+  for(Rgba& n: noise) {
+    vec3 normalized;
+    normalized.x = getRandomf(-1.f, 1.f);
+    normalized.y = 0.f;
+    normalized.z = getRandomf(-1.f, 1.f);
+
+    normalized = normalized * .5f + vec3(.5f);
+    n = Rgba(normalized, 1.f);
+  }
+
+  return noise;
 }
 
 S<RHIDevice> mDevice;
@@ -81,6 +98,7 @@ light_info_t mLight;
 Transform mLightTransform;
 Texture2::sptr_t texNormal;
 Texture2::sptr_t texScene;
+Texture2::sptr_t texNoise;
 RHIBuffer::sptr_t vbo[4];
 RHIBuffer::sptr_t ibo;
 RHIBuffer::sptr_t cVp;
@@ -92,8 +110,9 @@ ShaderResourceView::sptr_t texSrv;
 DescriptorSet::sptr_t descriptorSet;
 FrameBuffer* frameBuffer;
 
+#define NUM_KERNEL 64
 struct ssao_param_t {
-  vec4 kernels[32];
+  vec4 kernels[NUM_KERNEL];
 };
 ssao_param_t mSSAOParam;
 FrameBuffer* ssaoFrameBuffer;
@@ -107,16 +126,17 @@ uint elementCount = 0;
 uint numVerts = 0;
 
 void genSSAOData() {
-  for(uint i = 0; i<32; i++) {
-    float scale = (float)i / 32.f;
+  for(uint i = 0; i<NUM_KERNEL; i++) {
+    float scale = (float)i / (float)NUM_KERNEL;
     scale = smoothStart3(scale);
     vec3 normalized;
-    normalized.x = getRandomf01();
+    normalized.x = getRandomf(-1.f, 1.f);
     normalized.y = getRandomf01();
-    normalized.z = getRandomf01();
+    normalized.z = getRandomf(-1.f, 1.f);
 
-    normalized = (normalized * 2.f - vec3::one).normalized();
-    mSSAOParam.kernels[i] = vec4(scale * normalized, 0.f);
+    normalized = normalized.normalized();
+    normalized *= scale;
+    mSSAOParam.kernels[i] = vec4(normalized, 0.f);
     //mSSAOParam.kernels[i] = vec4(normalized, 0.f);
   }
 }
@@ -126,28 +146,31 @@ void Initialize() {
   mCamera = new Camera();
   mCamera->transfrom().localPosition() = { -1, -1, -1 };
   mCamera->lookAt({ -1, -1, -1 }, vec3::zero);
-  mCamera->setProjectionPrespective(30.f, 3.f*CLIENT_ASPECT, 3.f, .1f, 100.f);
+  mCamera->setProjectionPrespective(30.f, 3.f*CLIENT_ASPECT, 3.f, .1f, 500.f);
   
   mDevice = RHIDevice::get();
   mContext = mDevice->defaultRenderContext();
 
+  uint w = Window::Get()->bounds().width();
+  uint h = (uint)Window::Get()->bounds().height();
   texNormal = Texture2::create(
-      Window::Get()->bounds().width(), 
-      Window::Get()->bounds().height(), 
+      w, 
+      h, 
       TEXTURE_FORMAT_RGBA8, 
       RHIResource::BindingFlag::RenderTarget);
 
   ssaoMap = Texture2::create(
-    Window::Get()->bounds().width(),
-    Window::Get()->bounds().height(),
+    w,
+    h,
     TEXTURE_FORMAT_RGBA8,
     RHIResource::BindingFlag::RenderTarget);
 
   texScene = Texture2::create(
-    Window::Get()->bounds().width(),
-    Window::Get()->bounds().height(),
+    w,
+    h,
     TEXTURE_FORMAT_RGBA8,
     RHIResource::BindingFlag::RenderTarget);
+
   // main pass
   {
     FrameBuffer::Desc fDesc;
@@ -176,7 +199,10 @@ void Initialize() {
     Mesher ms;
 
     ms.begin(DRAW_TRIANGES);
-    ms.quad(vec3::zero, vec3::right, vec3::forward, vec2(40.f));
+    //ms.cube(vec3(30.f, 100.f, 0), vec3(200.f));
+    ms.cube(vec3(0.f, 10.f, 30), vec3(20.f));
+    ms.cube(vec3(-20.f, 15.f, -30), vec3(30.f));
+    ms.quad(vec3::zero, vec3::right, vec3::forward, vec2(300.f));
     ms.sphere(vec3(0, 10.f, 0), 10.f, 50, 50);
     ms.end();
 
@@ -208,6 +234,11 @@ void Initialize() {
     //
     std::vector<UINT8> data = GenerateTextureData();
     texture = Texture2::create(texWidth, texHeight, TEXTURE_FORMAT_RGBA8, RHIResource::BindingFlag::ShaderResource, data.data(), data.size());
+
+    std::vector<Rgba> noise = genNoise(w, h);
+    texNoise = Texture2::create(w, h, TEXTURE_FORMAT_RGBA8,
+      RHIResource::BindingFlag::ShaderResource,
+      noise.data(), w * h * sizeof(Rgba));
     vpCbv = ConstantBufferView::create(cVp);
     lightCbv = ConstantBufferView::create(cLight);
     texSrv = ShaderResourceView::create(texture, 0, 1, 0, 1);
@@ -227,7 +258,7 @@ void Initialize() {
       RootSignature::Desc desc;
       RootSignature::desc_set_layout_t layout;
       layout.addRange(DescriptorSet::Type::Cbv, 0, 2);
-      layout.addRange(DescriptorSet::Type::TextureSrv, 0, 3);
+      layout.addRange(DescriptorSet::Type::TextureSrv, 0, 4);
       ssaoDescriptorSet = DescriptorSet::create(mDevice->gpuDescriptorPool(), layout);
       desc.addDescriptorSet(layout);
       ssaoRootSig = RootSignature::create(desc);
@@ -247,9 +278,11 @@ void Initialize() {
     ssaoDescriptorSet->setCbv(0, 1, *ssaoParamCbv);
     ssaoDescriptorSet->setSrv(1, 1, texNormal->srv());
     ssaoDescriptorSet->setSrv(1, 2, texScene->srv());
+    ssaoDescriptorSet->setSrv(1, 3, texNoise->srv());
   }
 }
 
+bool runAO = true;
 void onInput() {
   static float angle = 0.f;
   static float distance = 15.f;
@@ -268,6 +301,11 @@ void onInput() {
     ldistance += 0.5f;
   }
 
+  if(Input::Get().isKeyDown(KEYBOARD_SPACE)) {
+    runAO = false;
+  } else {
+    runAO = true;
+  }
   distance = std::max(.1f, distance);
   ldistance = std::max(.1f, ldistance);
   if(Input::Get().isKeyDown('A')) {
@@ -285,15 +323,18 @@ void onInput() {
   vec3 position = fromSpherical(distance, angle, 30.f);
   mCamera->lookAt(position, vec3::zero);
   mLightTransform.setWorldTransform(mat44::lookAt(fromSpherical(ldistance, langle, 30.f), vec3::zero));
-  mLight.asSpotLight(mLightTransform.position(), mLightTransform.forward(), 5.f, 10.f, 1.f);
+  mLight.asSpotLight(mLightTransform.position(), mLightTransform.forward(), 30.f, 45.f, 3.f);
 
 };
 
 
 void mainPass() {
   mContext->resourceBarrier(texNormal.get(), RHIResource::State::RenderTarget);
-
-  frameBuffer->setColorTarget(texScene, 0);
+  if(runAO) {
+    frameBuffer->setColorTarget(texScene, 0);
+  } else {
+    frameBuffer->setColorTarget(mDevice->backBuffer(), 0);
+  }
   frameBuffer->setColorTarget(texNormal, 1);
   frameBuffer->setDepthStencilTarget(mDevice->depthBuffer());
 
@@ -319,6 +360,7 @@ void mainPass() {
 }
 
 void SSAO() {
+  if (!runAO) return;
   mContext->resourceBarrier(texNormal.get(), RHIResource::State::ShaderResource);
   mContext->resourceBarrier(texScene.get(), RHIResource::State::ShaderResource);
   mContext->resourceBarrier(mDevice->depthBuffer().get(), RHIResource::State::ShaderResource);
@@ -328,7 +370,6 @@ void SSAO() {
   ssaoFrameBuffer->setColorTarget(ssaoMap, 1);
 
   mContext->setPipelineState(ssaoPipelineState);
-  ssaoDescriptorSet->setSrv(1, 0, mDevice->depthBuffer()->srv());
   ssaoDescriptorSet->bindForGraphics(*mContext, *ssaoRootSig, 0);
 
   mContext->setFrameBuffer(*ssaoFrameBuffer);
@@ -352,6 +393,9 @@ void render() {
     texNormal->rtv(),
     Rgba::black);
   mContext->clearDepthStencilTarget(*mDevice->depthBuffer()->dsv());
+
+  ssaoDescriptorSet->setSrv(1, 0, mDevice->depthBuffer()->srv());
+  
   mainPass();
   SSAO();
   mDevice->present();

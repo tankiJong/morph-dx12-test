@@ -54,8 +54,10 @@ PSInput VSMain(uint id: SV_VertexID)
 	return input;
 }
 
+#define NUM_KERNEL 64
+
 struct ssao_param_t {
-	float4 kernels[32];
+	float4 kernels[NUM_KERNEL];
 };
 
 cbuffer cCamera : register(b0) {
@@ -69,6 +71,7 @@ cbuffer cSSAOParam: register(b1) {
 Texture2D gTexDepth : register(t0);
 Texture2D gTexNormal : register(t1);
 Texture2D gTexScene: register(t2);
+Texture2D gTexNoise: register(t3);
 SamplerState gSampler : register(s0);
 
 
@@ -78,42 +81,72 @@ struct PSOutput {
 };
 PSOutput PSMain(PSInput input) : SV_TARGET 
 {
+	PSOutput output;
 	// get world position, normal, tbn transform
-
-	float4 ndc = float4(input.uv, gTexDepth.Sample(gSampler, input.uv).r, 1.f);
-	float4 almostWorldPosition = mul(inverse(mul(projection, view)), ndc);
+	float2 xy = input.uv;
+	xy.y = 1.f - xy.y;
+	//output.color = float4(xy, 0, 1);
+	//return output;
+	float d = gTexDepth.Sample(gSampler, input.uv).r;
+	float3 xyz = float3(xy, d);
+	xyz = xyz * 2.f - 1.f;
+	float4 ndc = float4(xyz, 1.f);
+	float4 almostWorldPosition = mul(inverse(mul(projection,view)), ndc);
 	float3 worldPosition = almostWorldPosition.xyz / almostWorldPosition.w;
+	//float linearDepth = worldPosition.z / 100.f;
+	//output.color = float4(linearDepth, linearDepth, linearDepth, 1.f);
 
-	float3 normal = normalize(gTexNormal.Sample(gSampler, input.uv) * 2.f - 1.f);
+	float3 normal = normalize(gTexNormal.Sample(gSampler, input.uv).xyz * 2.f - 1.f);
 
-	float3 RIGHT = float3(1.f, 0.f, 0.f);
-	float3 bitan = normalize(cross(RIGHT, normal));
+	float3 noise = (gTexNoise.Sample(gSampler, input.uv).xyz - .5f) * 2.f;
+	noise.y = 0;
+	float3 right = float3(1.f, 0.f, 0.f);
+	float3 _tan = normalize(right+noise);
+	float3 bitan = cross(_tan, normal);
 	float3 tan = cross(bitan, normal);
-	float3x3 tbn = float3x3(tan, bitan, normal);
+
+	float3x3 tbn = transpose(float3x3(tan, normal, bitan));
+	
+	//normal = mul(tbn, float3(1,0,0)); 
+	//float a = dot(normal, tan) + dot(normal, bitan) ;
+	//output.color = float4(normal, 1.f);
+	//return output;
+	float validRange = 0.0001f;
 
 	float occlusion = 0.f;
 
-	for(uint i = 0; i < 32; i++) {
-		
-		float3 sample = mul(tbn, ssaoParam.kernels[i].xyz);
+	for(uint i = 0; i < NUM_KERNEL; i++) {
+		float3 kernel = ssaoParam.kernels[i].xyz;
+		float3 sample = mul(tbn, kernel) * 5.f;
 		sample += worldPosition;
 
-		float4 screen = float4(sample, 1.f);
-		screen = mul(mul(projection, view), screen);
-		float3 uvd = screen.xyz / screen.w;
-		
-		float depth = gTexDepth.Sample(gSampler, uvd.xy).r;
+		float4 clip = float4(sample, 1.f);
+		clip = mul(mul(projection, view), clip);
 
-		occlusion += depth > uvd.z ? 0.f : 1.f;
+		float3 uvd = clip.xyz / clip.w;
+		uvd = uvd * .5f + .5f;
+		float2 uv = uvd.xy;
+		uv.y = 1 - uv.y;
+		
+		//float linDepth = uvd.z / 100.f;
+		//output.occlusion = float4(linDepth, linDepth, linDepth, 1.f);
+		//return output;
+		float depth = gTexDepth.Sample(gSampler, uv).r;
+
+		//output.color = float4(depth, depth, depth, 1.f);
+		//return output;
+
+		float rangeCheck = smoothstep(0.f , 1.f, validRange / abs(d - depth));
+		occlusion += rangeCheck * (((depth+0.00003) < uvd.z) ? 1.f: 0.f);
 	}
 
-	occlusion = 1.f - occlusion / 32.f;
+	occlusion = 1.f - (occlusion / (float)NUM_KERNEL);
 	
 	float4 color = gTexScene.Sample(gSampler, input.uv);
 
-	PSOutput output;
-	output.color = occlusion * color;
-	output.occlusion = float4(occlusion, 0.f, 0.f, 1.f);
+	
+	output.color = pow(occlusion, 3.f) * color;
+	output.occlusion = float4(occlusion, occlusion, occlusion, 1.f);
 
 	return output;
 }
