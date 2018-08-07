@@ -64,15 +64,15 @@ cbuffer cCamera : register(b0) {
   float4x4 projection;
   float4x4 view;
 };
-cbuffer cSSAOParam: register(b1) {
-	ssao_param_t ssaoParam;
-}
+
+ConstantBuffer<ssao_param_t> ssaoParam: register(b1);
 
 Texture2D gTexDepth : register(t0);
 Texture2D gTexNormal : register(t1);
 Texture2D gTexScene: register(t2);
 Texture2D gTexNoise: register(t3);
 SamplerState gSampler : register(s0);
+
 
 
 struct PSOutput {

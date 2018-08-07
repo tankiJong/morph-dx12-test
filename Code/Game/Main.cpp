@@ -9,6 +9,7 @@
 #include "Engine/Graphics/RHI/PipelineState.hpp"
 #include "Engine/Graphics/RHI/RHITexture.hpp"
 #include "Engine/Graphics/RHI/ResourceView.hpp"
+#include "Engine/Graphics/RHI/TypedBuffer.hpp"
 #include "Engine/Core/Time/Clock.hpp"
 #include "Engine/Graphics/RHI/Texture.hpp"
 #include "Engine/Graphics/Model/Vertex.hpp"
@@ -18,6 +19,9 @@
 #include "Engine/Application/Window.hpp"
 #include "Engine/Graphics/Model/Mesher.hpp"
 #include "Engine/Math/MathUtils.hpp"
+#include "Engine/Graphics/RHI/RHIBuffer.hpp"
+#include "Engine/Graphics/Program/Program.hpp"
+
 #define UNUSED(x) (void)x
 
 static bool gQuit = false;
@@ -90,7 +94,7 @@ std::vector<Rgba> genNoise(uint width, uint height) {
 
 S<RHIDevice> mDevice;
 S<RHIContext> mContext;
-PipelineState::sptr_t pipelineState;
+GraphicsState::sptr_t GraphicsState;
 RootSignature::sptr_t rootSig;
 
 Camera* mCamera;
@@ -99,8 +103,10 @@ Transform mLightTransform;
 Texture2::sptr_t texNormal;
 Texture2::sptr_t texScene;
 Texture2::sptr_t texNoise;
-RHIBuffer::sptr_t vbo[4];
-RHIBuffer::sptr_t ibo;
+//VertexBuffer::sptr_t vbo[4];
+//IndexBuffer::sptr_t ibo;
+
+Mesh* mesh;
 RHIBuffer::sptr_t cVp;
 RHIBuffer::sptr_t cLight;
 Texture2::sptr_t texture;
@@ -116,14 +122,14 @@ struct ssao_param_t {
 };
 ssao_param_t mSSAOParam;
 FrameBuffer* ssaoFrameBuffer;
-PipelineState::sptr_t ssaoPipelineState;
+GraphicsState::sptr_t ssaoGraphicsState;
 RootSignature::sptr_t ssaoRootSig;
 RHIBuffer::sptr_t cSSAOParams;
 ConstantBufferView::sptr_t ssaoParamCbv;
 DescriptorSet::sptr_t ssaoDescriptorSet;
 Texture2::sptr_t ssaoMap;
-uint elementCount = 0; 
-uint numVerts = 0;
+//uint elementCount = 0; 
+//uint numVerts = 0;
 
 void genSSAOData() {
   for(uint i = 0; i<NUM_KERNEL; i++) {
@@ -140,6 +146,12 @@ void genSSAOData() {
     //mSSAOParam.kernels[i] = vec4(normalized, 0.f);
   }
 }
+
+
+RootSignature::sptr_t computeRootSig;
+DescriptorSet::sptr_t computeDescriptorSet;
+ComputeState::sptr_t  computePipelineState;
+
 void Initialize() {
   genSSAOData();
   Window::Get()->addWinMessageHandler(windowProc);
@@ -169,7 +181,7 @@ void Initialize() {
     w,
     h,
     TEXTURE_FORMAT_RGBA8,
-    RHIResource::BindingFlag::RenderTarget);
+    RHIResource::BindingFlag::RenderTarget | RHIResource::BindingFlag::UnorderedAccess);
 
   // main pass
   {
@@ -188,12 +200,20 @@ void Initialize() {
       rootSig = RootSignature::create(desc);
     }
     {
-      PipelineState::Desc desc;
+      GraphicsState::Desc desc;
+
+      std::string shaderPath = "shaders.hlsl";
+      Program::sptr_t prog = Program::sptr_t(new Program());
+      prog->stage(SHADER_TYPE_VERTEX).setFromFile(shaderPath, "VSMain");
+      prog->stage(SHADER_TYPE_FRAGMENT).setFromFile(shaderPath, "PSMain");
+      prog->compile();
+      desc.setProgram(prog);
+
       desc.setRootSignature(rootSig);
-      desc.setPrimTye(PipelineState::PrimitiveType::Triangle);
+      desc.setPrimTye(GraphicsState::PrimitiveType::Triangle);
       desc.setVertexLayout(VertexLayout::For<vertex_lit_t>());
       desc.setFboDesc(fDesc);
-      pipelineState = PipelineState::create(desc);
+      GraphicsState = GraphicsState::create(desc);
     }
 
     Mesher ms;
@@ -206,23 +226,7 @@ void Initialize() {
     ms.sphere(vec3(0, 10.f, 0), 10.f, 50, 50);
     ms.end();
 
-    vec3* pos = ms.mVertices.vertices().position;
-    vec3* normals = ms.mVertices.vertices().normal;
-    Rgba* color = ms.mVertices.vertices().color;
-    vec2* uvs = ms.mVertices.vertices().uv;
-    numVerts = ms.mVertices.count();
-    elementCount = ms.mIndices.size();
-    vbo[0] =
-      RHIBuffer::create(sizeof(vec3) * numVerts, RHIResource::BindingFlag::VertexBuffer, RHIBuffer::CPUAccess::Write, pos);
-    vbo[1] =
-      RHIBuffer::create(sizeof(Rgba) * numVerts, RHIResource::BindingFlag::VertexBuffer, RHIBuffer::CPUAccess::Write, color);
-    vbo[2] =
-      RHIBuffer::create(sizeof(vec2) * numVerts, RHIResource::BindingFlag::VertexBuffer, RHIBuffer::CPUAccess::Write, uvs);
-    vbo[3] =
-      RHIBuffer::create(sizeof(vec3) * numVerts, RHIResource::BindingFlag::VertexBuffer, RHIBuffer::CPUAccess::Write, normals);
-
-    ibo = RHIBuffer::create(sizeof(uint) * elementCount, RHIResource::BindingFlag::IndexBuffer,
-                            RHIBuffer::CPUAccess::Write, ms.mIndices.data());
+    mesh = ms.createMesh<vertex_lit_t>();
 
     camera_t cameraUbo = mCamera->ubo();
     cVp = RHIBuffer::create(sizeof(camera_t), RHIResource::BindingFlag::ConstantBuffer, RHIBuffer::CPUAccess::Write, &cameraUbo);
@@ -264,12 +268,20 @@ void Initialize() {
       ssaoRootSig = RootSignature::create(desc);
     }
     {
-      PipelineState::Desc desc;
+      GraphicsState::Desc desc;
+
+      std::string shaderPath = "ssao.hlsl";
+      Program::sptr_t prog = Program::sptr_t(new Program());
+      prog->stage(SHADER_TYPE_VERTEX).setFromFile(shaderPath, "VSMain");
+      prog->stage(SHADER_TYPE_FRAGMENT).setFromFile(shaderPath, "PSMain");
+      prog->compile();
+      desc.setProgram(prog);
+
       desc.setRootSignature(ssaoRootSig);
-      desc.setPrimTye(PipelineState::PrimitiveType::Triangle);
+      desc.setPrimTye(GraphicsState::PrimitiveType::Triangle);
       desc.setVertexLayout(VertexLayout::For<vertex_lit_t>());
       desc.setFboDesc(fDesc);
-      ssaoPipelineState = PipelineState::create(desc);
+      ssaoGraphicsState = GraphicsState::create(desc);
     }
 
     cSSAOParams = RHIBuffer::create(sizeof(ssao_param_t), RHIResource::BindingFlag::ConstantBuffer, RHIBuffer::CPUAccess::Write, &mSSAOParam);
@@ -279,6 +291,25 @@ void Initialize() {
     ssaoDescriptorSet->setSrv(1, 1, texNormal->srv());
     ssaoDescriptorSet->setSrv(1, 2, texScene->srv());
     ssaoDescriptorSet->setSrv(1, 3, texNoise->srv());
+  }
+
+  // compute
+  {
+    {
+      RootSignature::Desc desc;
+      RootSignature::desc_set_layout_t layout;
+      layout.addRange(DescriptorSet::Type::TextureUav, 0, 1);
+      computeDescriptorSet = DescriptorSet::create(mDevice->gpuDescriptorPool(), layout);
+      desc.addDescriptorSet(layout);
+      computeRootSig = RootSignature::create(desc);
+    }
+    {
+      ComputeState::Desc desc;
+      desc.setRootSignature(computeRootSig);
+      computePipelineState = ComputeState::create(desc);
+    }
+
+    computeDescriptorSet->setUav(0, 0, *texScene->uav());
   }
 }
 
@@ -344,17 +375,16 @@ void mainPass() {
   cVp->updateData(&cameraUbo, 0, sizeof(camera_t));
 
   cLight->updateData(&mLight, 0, sizeof(light_info_t));
-  mContext->setPipelineState(pipelineState);
+  mContext->setGraphicsState(*GraphicsState);
 
   descriptorSet->bindForGraphics(*mContext, *rootSig, 0);
 
-  uint stride[] = { sizeof(vec3), sizeof(Rgba), sizeof(vec2), sizeof(vec3) };
-  for (int i = 0; i < 4; i++) {
-    mContext->setVertexBuffer(vbo[i], stride[i], i);
+  for(uint i = 0; i < mesh->mVertices.size(); i ++) {
+    mContext->setVertexBuffer(*mesh->vertices(i), i);
   }
-  mContext->setIndexBuffer(ibo);
+  mContext->setIndexBuffer(*mesh->indices());
 
-  mContext->drawIndexed(0, 0, elementCount);
+  mContext->drawIndexed(0, 0, mesh->indices()->elementCount());
   // mContext->draw(3, 3);
   // mContext->afterFrame();
 }
@@ -369,7 +399,7 @@ void SSAO() {
   ssaoFrameBuffer->setColorTarget(mDevice->backBuffer(), 0);
   ssaoFrameBuffer->setColorTarget(ssaoMap, 1);
 
-  mContext->setPipelineState(ssaoPipelineState);
+  mContext->setGraphicsState(*ssaoGraphicsState);
   ssaoDescriptorSet->bindForGraphics(*mContext, *ssaoRootSig, 0);
 
   mContext->setFrameBuffer(*ssaoFrameBuffer);
@@ -379,25 +409,37 @@ void SSAO() {
 
 }
 
+void computeTest() {
+  mContext->resourceBarrier(texScene.get(), RHIResource::State::UnorderedAccess);
+  mContext->setComputeState(*computePipelineState);
+  computeDescriptorSet->bindForCompute(*mContext, *computeRootSig);
+
+  uint x = uint(Window::Get()->bounds().width()) / 32 + 1;
+  uint y = uint(Window::Get()->bounds().height()) / 32 + 1;
+  mContext->dispatch(x, y, 1);
+
+}
+
 void render() {
   mContext->beforeFrame();
-  
+
   mContext->bindDescriptorHeap();
   mContext->resourceBarrier(texScene.get(), RHIResource::State::RenderTarget);
 
   mContext->clearRenderTarget(texScene->rtv(), Rgba(vec3{ 0.0f, 0.2f, 0.4f }));
   mContext->clearRenderTarget(
-    mDevice->backBuffer()->rtv(),
-    Rgba(vec3{ 0.0f, 0.2f, 0.4f }));
+   mDevice->backBuffer()->rtv(),
+   Rgba(vec3{ 0.0f, 0.2f, 0.4f }));
   mContext->clearRenderTarget(
-    texNormal->rtv(),
-    Rgba::black);
+   texNormal->rtv(),
+   Rgba::black);
   mContext->clearDepthStencilTarget(*mDevice->depthBuffer()->dsv());
 
   ssaoDescriptorSet->setSrv(1, 0, mDevice->depthBuffer()->srv());
-  
-  mainPass();
-  SSAO();
+
+  // mainPass();
+  // SSAO();
+  computeTest();
   mDevice->present();
 }
 
@@ -411,6 +453,7 @@ void runFrame() {
 
 void Shutdown() {
   mDevice->cleanup();
+
 }
 //-----------------------------------------------------------------------------------------------
 int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR commandLineString, int) {

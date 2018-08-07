@@ -53,64 +53,59 @@ I need to learn more about the life cycle about all ID3Dxxx* in terms of when ca
 ----------------
 
 # Week 3
-The main goal of the week is doing some resource related work, visually, to draw a textured mesh. and maybe I can have ConstBuffer to put in MVP.
+Turn out this week was mainly fighting with the infrastructure, how to do things correctly.
+I learned a lot ideas from Falcor and Unreal. I am now mainly following the way Falcor handles the RHI. Main reason is that Falcor provides an clean and pretty "light" way(compared with Unreal) to warpping around the api calls.
 
-## Draw mesh
-* Only vertex color, no textures
-* `Dx12CommandList::drawMesh(Mesh& mesh)`
-	- Mesh itself as a high level concept should be supported without much change
-	- to achieve that, introduce a couple of concept around `ID3D12Resource` and creation of certain resource views(VertexBufferView, IndexBufferView)
-		- UploadBuffer(debating whether should I expose this concept to the engine to have more chaos)
-		- `RenderBuffer` revisiting, some technical decision about resource architecture. Reference pattern: unreal, MiniEngine, Falcor. Maybe something in the middle? need some discussion with Forseth to see how he thinks about.
-	- in `drawMesh`, 
-		- call Dx12CommandList::setVertexBuffer(uint slot, span<BufferView<VertexBuffer>>)
-		- call Dx12CommandList::setIndexBuffer(uint slot, span<BufferView<IndexBuffer>>)
+-----------------
+## Reintroduce RHIDevice, RHIContext
+* before, these thing live in the Game project, as an simple layer help me to understand the concepts. This week, I started migrating these things into engine.
+* I did several decisions. 
+	- I do not have `Output` in my engine. That layer will add additional complexity which I do not really care for now. Device will be considered as Device+Output
+	- One device will only one context
+	- Unlike Falcor, I will only have one type of Context, which is the `RenderContext` in Falcor, i do not need this layer of inheritance and this pretty easy to change later.
 
-## draw textured mesh(following mentioned api probably gonna change)
-* Texture creation
-	- `S<Dx12Texture2D> Dx12Device::createTexture2D(const Blob& data, uvec2 size)`
-	- `S<Dx12ShaderResourceView> Dx12Device::createShaderResourceView(Dx12Texture2D& tex, uint mipLevel = 0)`
-* Texture binding
-	- `void Dx12CommandList::setTexture(Dx12Texture2D& tex, uint slot)`
-* Sampler
-	- `S<Dx12Sampler> Dx12Device::createSampler(eTextureSampleMode mode, eTextureWrapMode wrapMode)`
-  
+## Yaas
+* A lot of concept wrapper are residents of my engine now
+* For resource, I have `RHIContext::updateBuffer`, `RHIBuffer::create` two parts ready. Build around that, `RHIContext::resourceBarrier` ready
 
+## Nope
+* I do not even have a triangle again now, which is really really sad
+* As a reason of the previous point, I feel it's very hard for me to do things elegant and also get it working very fast. To achieve A, I will need to build B, which will need C, which will need D and E... But fortunately, I am almost done with pains.
+
+-----------------
 # Week 4
-The main goal of the week is to have an idea how to update `ShaderProgram` class and start lifting all class one level up.
-## RHI layer
-* `RHIOutput`, `RHIDevice`, `RHIContext`
-	- Dx12XXX should all derive from corresponding interface
-* RHIResources
-	- create all resource interface, Dx12 specific implementations derive from interfaces.
+* DrawMesh
+	- `PipelineState::setVertexBuffer(RHIBuffer*)`, `PipelineState::setIndexBuffer(RHIBuffer*)`
 
-## Material:  helper classes -> ShaderStage & ShaderProgram (stretch: shader pass)
-* implement class `Dx12ShaderStage`, `ShaderStage* RHIDevice::aquireShaderStage(const Blob& code)`
-* revisit `ShaderProgram` as interface, implement class `Dx12ShaderProgram`
-* `void RHIContext::setMaterial(const Shader& shader, uint pass)`(update current pipeline state object)
+* setTexture
+	- some fun stuffs around resource heap(first try)
+	- draw a textured mesh
+
+-----------------
+## Yaas
+* got texture up and I pretty like the structure for creating and using resource I have now
+
+## Nope
+* Texture creation is hard coded now, only support 2d, 4 components
+* frame buffer is kinda spaghetti now just a whole mess in `beginFrame`
+-----------------
 
 # Week 5
-Frame buffer
-## Frame Buffer
-* revisit `FrameBuffer`, implement `Dx12FrameBuffer`.
-	- `S<RenderTargetView> RHIDevice::createRenderTargetView(Texture2D& tex)`
-	- `void FrameBuffer::setColorTarget(Texture2D* tex, uint slot)`(update current root signature)
-	- `void FrameBuffer::setDepthTarget(Texture2D* tex)`(update current root signature)
+* Constant Buffer & CBV; SRV
+	- build around that, have some Resource view infrustructure in
+	- DescriptorSet can say setSrv(), setCbv()...
+* Defer Release for GPU resource
 
-* revisit `Camera` class, make sure that it can bind multiple render target.
-
-## Material
-* Shader reflection support(possibly will be very different from GL)
-* Ideally Material should just work
-* Revisit pushing renderer up -> may do this now; 
-  
 # Week 6
-Implement Phong shading in HLSL, screen space ambient occulation, update forward render pass
+* Hello Cube 
+	- re-introduce FBO, Mesh, Camera, scratch for immediate renderer
+	- drawMesh
+* Shader support
+	- architecture research
 
 # Week 7
-Integrating DXR
+...
 
 # Week 8
-using DXR to do ray tracing AO, and using that AO texture.
+...
 
-# Stechgoals?

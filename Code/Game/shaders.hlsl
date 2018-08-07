@@ -1,3 +1,4 @@
+#include "b.hlsl"
 
 #ifndef __MATRIX_INCLUDED__
 #define __MATRIX_INCLUDED__
@@ -77,6 +78,7 @@ struct PSInput {
   float4 color : COLOR;
   float2 uv: UV;
   float3 normal: NORMAL;
+	float3 tangent: TANGENT;
 	float3 worldPosition: PASS_WORLD;
 	float3 eyePosition: PASS_EYE;
 };
@@ -84,7 +86,7 @@ struct PSInput {
 Texture2D gTexDiffuse : register(t0);
 SamplerState g_sampler : register(s0);
 
-PSInput VSMain(float3 position : POSITION, float4 color : COLOR, float2 uv : UV, float3 normal : NORMAL) {
+PSInput VSMain(float3 position : POSITION, float4 color : COLOR, float2 uv : UV, float3 normal : NORMAL, float3 tangent: TANGENT) {
   PSInput result;
 
 	result.worldPosition = position;
@@ -92,6 +94,7 @@ PSInput VSMain(float3 position : POSITION, float4 color : COLOR, float2 uv : UV,
   result.color = color;
   result.uv = uv;
   result.normal = normal;
+	result.tangent = tangent;
 	result.eyePosition = inverse(view)._14_24_34;
   return result;
 }
