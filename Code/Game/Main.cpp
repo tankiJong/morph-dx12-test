@@ -110,8 +110,6 @@ Mesh* mesh;
 RHIBuffer::sptr_t cVp;
 RHIBuffer::sptr_t cLight;
 Texture2::sptr_t texture;
-ConstantBufferView::sptr_t vpCbv;
-ConstantBufferView::sptr_t lightCbv;
 ShaderResourceView::sptr_t texSrv;
 DescriptorSet::sptr_t descriptorSet;
 FrameBuffer* frameBuffer;
@@ -128,8 +126,22 @@ RHIBuffer::sptr_t cSSAOParams;
 ConstantBufferView::sptr_t ssaoParamCbv;
 DescriptorSet::sptr_t ssaoDescriptorSet;
 Texture2::sptr_t ssaoMap;
+
+
+RHIBuffer::sptr_t computeVerts;
 //uint elementCount = 0; 
 //uint numVerts = 0;
+
+void buildMeshDataForCompute(vec3* data, uint size) {
+  vec4* loca = (vec4*)_alloca(size * sizeof(vec4));
+
+  for(uint i = 0; i < size; i++) {
+    loca[i] = vec4(data[i], 1.f);
+  }
+
+  computeVerts = RHIBuffer::create(sizeof(vec4) * size, RHIResource::BindingFlag::UnorderedAccess | RHIResource::BindingFlag::ShaderResource, RHIBuffer::CPUAccess::None);
+  computeVerts->updateData(loca, 0, sizeof(vec4) * size);
+}
 
 void genSSAOData() {
   for(uint i = 0; i<NUM_KERNEL; i++) {
@@ -218,15 +230,16 @@ void Initialize() {
 
     Mesher ms;
 
-    ms.begin(DRAW_TRIANGES);
-    //ms.cube(vec3(30.f, 100.f, 0), vec3(200.f));
+    ms.begin(DRAW_TRIANGES, false);
+    // ms.cube(vec3(30.f, 100.f, 0), vec3(200.f));
     ms.cube(vec3(0.f, 10.f, 30), vec3(20.f));
     ms.cube(vec3(-20.f, 15.f, -30), vec3(30.f));
     ms.quad(vec3::zero, vec3::right, vec3::forward, vec2(300.f));
-    ms.sphere(vec3(0, 10.f, 0), 10.f, 50, 50);
+    // ms.sphere(vec3(0, 10.f, 0), 10.f, 50, 50);
     ms.end();
-
     mesh = ms.createMesh<vertex_lit_t>();
+
+    buildMeshDataForCompute(ms.mVertices.vertices().position, ms.mVertices.count());
 
     camera_t cameraUbo = mCamera->ubo();
     cVp = RHIBuffer::create(sizeof(camera_t), RHIResource::BindingFlag::ConstantBuffer, RHIBuffer::CPUAccess::Write, &cameraUbo);
@@ -243,62 +256,60 @@ void Initialize() {
     texNoise = Texture2::create(w, h, TEXTURE_FORMAT_RGBA8,
       RHIResource::BindingFlag::ShaderResource,
       noise.data(), w * h * sizeof(Rgba));
-    vpCbv = ConstantBufferView::create(cVp);
-    lightCbv = ConstantBufferView::create(cLight);
-    texSrv = ShaderResourceView::create(texture, 0, 1, 0, 1);
-    descriptorSet->setCbv(0, 0, *vpCbv);
-    descriptorSet->setCbv(0, 1, *lightCbv);
-    descriptorSet->setSrv(1, 0, *texSrv);
+    descriptorSet->setCbv(0, 0, *cVp->cbv());
+    descriptorSet->setCbv(0, 1, *cLight->cbv());
+    descriptorSet->setSrv(1, 0, texture->srv());
     mContext->resourceBarrier(texture.get(), RHIResource::State::ShaderResource);
   }
 
   // SSAO resource
-  {
-    FrameBuffer::Desc fDesc;
-    fDesc.defineColorTarget(0, TEXTURE_FORMAT_RGBA8);
-    fDesc.defineColorTarget(1, TEXTURE_FORMAT_RGBA8);
-    ssaoFrameBuffer = new FrameBuffer(fDesc);
-    {
-      RootSignature::Desc desc;
-      RootSignature::desc_set_layout_t layout;
-      layout.addRange(DescriptorSet::Type::Cbv, 0, 2);
-      layout.addRange(DescriptorSet::Type::TextureSrv, 0, 4);
-      ssaoDescriptorSet = DescriptorSet::create(mDevice->gpuDescriptorPool(), layout);
-      desc.addDescriptorSet(layout);
-      ssaoRootSig = RootSignature::create(desc);
-    }
-    {
-      GraphicsState::Desc desc;
-
-      std::string shaderPath = "ssao.hlsl";
-      Program::sptr_t prog = Program::sptr_t(new Program());
-      prog->stage(SHADER_TYPE_VERTEX).setFromFile(shaderPath, "VSMain");
-      prog->stage(SHADER_TYPE_FRAGMENT).setFromFile(shaderPath, "PSMain");
-      prog->compile();
-      desc.setProgram(prog);
-
-      desc.setRootSignature(ssaoRootSig);
-      desc.setPrimTye(GraphicsState::PrimitiveType::Triangle);
-      desc.setVertexLayout(VertexLayout::For<vertex_lit_t>());
-      desc.setFboDesc(fDesc);
-      ssaoGraphicsState = GraphicsState::create(desc);
-    }
-
-    cSSAOParams = RHIBuffer::create(sizeof(ssao_param_t), RHIResource::BindingFlag::ConstantBuffer, RHIBuffer::CPUAccess::Write, &mSSAOParam);
-    ssaoParamCbv = ConstantBufferView::create(cSSAOParams);
-    ssaoDescriptorSet->setCbv(0, 0, *vpCbv);
-    ssaoDescriptorSet->setCbv(0, 1, *ssaoParamCbv);
-    ssaoDescriptorSet->setSrv(1, 1, texNormal->srv());
-    ssaoDescriptorSet->setSrv(1, 2, texScene->srv());
-    ssaoDescriptorSet->setSrv(1, 3, texNoise->srv());
-  }
+  // {
+  //   FrameBuffer::Desc fDesc;
+  //   fDesc.defineColorTarget(0, TEXTURE_FORMAT_RGBA8);
+  //   fDesc.defineColorTarget(1, TEXTURE_FORMAT_RGBA8);
+  //   ssaoFrameBuffer = new FrameBuffer(fDesc);
+  //   {
+  //     RootSignature::Desc desc;
+  //     RootSignature::desc_set_layout_t layout;
+  //     layout.addRange(DescriptorSet::Type::Cbv, 0, 2);
+  //     layout.addRange(DescriptorSet::Type::TextureSrv, 0, 4);
+  //     ssaoDescriptorSet = DescriptorSet::create(mDevice->gpuDescriptorPool(), layout);
+  //     desc.addDescriptorSet(layout);
+  //     ssaoRootSig = RootSignature::create(desc);
+  //   }
+  //   {
+  //     GraphicsState::Desc desc;
+  //
+  //     std::string shaderPath = "ssao.hlsl";
+  //     Program::sptr_t prog = Program::sptr_t(new Program());
+  //     prog->stage(SHADER_TYPE_VERTEX).setFromFile(shaderPath, "VSMain");
+  //     prog->stage(SHADER_TYPE_FRAGMENT).setFromFile(shaderPath, "PSMain");
+  //     prog->compile();
+  //     desc.setProgram(prog);
+  //
+  //     desc.setRootSignature(ssaoRootSig);
+  //     desc.setPrimTye(GraphicsState::PrimitiveType::Triangle);
+  //     desc.setVertexLayout(VertexLayout::For<vertex_lit_t>());
+  //     desc.setFboDesc(fDesc);
+  //     ssaoGraphicsState = GraphicsState::create(desc);
+  //   }
+  //
+  //   cSSAOParams = RHIBuffer::create(sizeof(ssao_param_t), RHIResource::BindingFlag::ConstantBuffer, RHIBuffer::CPUAccess::Write, &mSSAOParam);
+  //   ssaoParamCbv = ConstantBufferView::create(cSSAOParams);
+  //   ssaoDescriptorSet->setCbv(0, 0, *vpCbv);
+  //   ssaoDescriptorSet->setCbv(0, 1, *ssaoParamCbv);
+  //   ssaoDescriptorSet->setSrv(1, 1, texNormal->srv());
+  //   ssaoDescriptorSet->setSrv(1, 2, texScene->srv());
+  //   ssaoDescriptorSet->setSrv(1, 3, texNoise->srv());
+  // }
 
   // compute
   {
     {
       RootSignature::Desc desc;
       RootSignature::desc_set_layout_t layout;
-      layout.addRange(DescriptorSet::Type::TextureUav, 0, 1);
+      layout.addRange(DescriptorSet::Type::TextureUav, 0, 2);
+      layout.addRange(DescriptorSet::Type::Cbv, 0, 2);
       computeDescriptorSet = DescriptorSet::create(mDevice->gpuDescriptorPool(), layout);
       desc.addDescriptorSet(layout);
       computeRootSig = RootSignature::create(desc);
@@ -310,6 +321,9 @@ void Initialize() {
     }
 
     computeDescriptorSet->setUav(0, 0, *texScene->uav());
+    computeDescriptorSet->setUav(0, 1, *computeVerts->uav());
+    computeDescriptorSet->setCbv(1, 0, *cVp->cbv());
+    computeDescriptorSet->setCbv(1, 1, *cLight->cbv());
   }
 }
 
@@ -356,16 +370,17 @@ void onInput() {
   mLightTransform.setWorldTransform(mat44::lookAt(fromSpherical(ldistance, langle, 30.f), vec3::zero));
   mLight.asSpotLight(mLightTransform.position(), mLightTransform.forward(), 30.f, 45.f, 3.f);
 
-};
+  vec3 fwd = mCamera->forward();
 
+};
 
 void mainPass() {
   mContext->resourceBarrier(texNormal.get(), RHIResource::State::RenderTarget);
-  if(runAO) {
-    frameBuffer->setColorTarget(texScene, 0);
-  } else {
-    frameBuffer->setColorTarget(mDevice->backBuffer(), 0);
-  }
+  // if(runAO) {
+  // frameBuffer->setColorTarget(texScene, 0);
+  // } else {
+  frameBuffer->setColorTarget(mDevice->backBuffer(), 0);
+  // }
   frameBuffer->setColorTarget(texNormal, 1);
   frameBuffer->setDepthStencilTarget(mDevice->depthBuffer());
 
@@ -382,32 +397,32 @@ void mainPass() {
   for(uint i = 0; i < mesh->mVertices.size(); i ++) {
     mContext->setVertexBuffer(*mesh->vertices(i), i);
   }
-  mContext->setIndexBuffer(*mesh->indices());
+  // mContext->setIndexBuffer(*mesh->indices());
 
-  mContext->drawIndexed(0, 0, mesh->indices()->elementCount());
+  mContext->draw(0, mesh->vertices(0)->elementCount());
   // mContext->draw(3, 3);
   // mContext->afterFrame();
 }
 
-void SSAO() {
-  if (!runAO) return;
-  mContext->resourceBarrier(texNormal.get(), RHIResource::State::ShaderResource);
-  mContext->resourceBarrier(texScene.get(), RHIResource::State::ShaderResource);
-  mContext->resourceBarrier(mDevice->depthBuffer().get(), RHIResource::State::ShaderResource);
-  mContext->resourceBarrier(ssaoMap.get(), RHIResource::State::RenderTarget);
-
-  ssaoFrameBuffer->setColorTarget(mDevice->backBuffer(), 0);
-  ssaoFrameBuffer->setColorTarget(ssaoMap, 1);
-
-  mContext->setGraphicsState(*ssaoGraphicsState);
-  ssaoDescriptorSet->bindForGraphics(*mContext, *ssaoRootSig, 0);
-
-  mContext->setFrameBuffer(*ssaoFrameBuffer);
-  mContext->draw(0, 3);
-
-  mContext->resourceBarrier(ssaoMap.get(), RHIResource::State::ShaderResource);
-
-}
+// void SSAO() {
+//   if (!runAO) return;
+//   mContext->resourceBarrier(texNormal.get(), RHIResource::State::ShaderResource);
+//   mContext->resourceBarrier(texScene.get(), RHIResource::State::ShaderResource);
+//   mContext->resourceBarrier(mDevice->depthBuffer().get(), RHIResource::State::ShaderResource);
+//   mContext->resourceBarrier(ssaoMap.get(), RHIResource::State::RenderTarget);
+//
+//   ssaoFrameBuffer->setColorTarget(mDevice->backBuffer(), 0);
+//   ssaoFrameBuffer->setColorTarget(ssaoMap, 1);
+//
+//   mContext->setGraphicsState(*ssaoGraphicsState);
+//   ssaoDescriptorSet->bindForGraphics(*mContext, *ssaoRootSig, 0);
+//
+//   mContext->setFrameBuffer(*ssaoFrameBuffer);
+//   mContext->draw(0, 3);
+//
+//   mContext->resourceBarrier(ssaoMap.get(), RHIResource::State::ShaderResource);
+//
+// }
 
 void computeTest() {
   mContext->resourceBarrier(texScene.get(), RHIResource::State::UnorderedAccess);
@@ -425,7 +440,6 @@ void render() {
 
   mContext->bindDescriptorHeap();
   mContext->resourceBarrier(texScene.get(), RHIResource::State::RenderTarget);
-
   mContext->clearRenderTarget(texScene->rtv(), Rgba(vec3{ 0.0f, 0.2f, 0.4f }));
   mContext->clearRenderTarget(
    mDevice->backBuffer()->rtv(),
@@ -435,11 +449,13 @@ void render() {
    Rgba::black);
   mContext->clearDepthStencilTarget(*mDevice->depthBuffer()->dsv());
 
-  ssaoDescriptorSet->setSrv(1, 0, mDevice->depthBuffer()->srv());
+  // ssaoDescriptorSet->setSrv(1, 0, mDevice->depthBuffer()->srv());
 
-  // mainPass();
   // SSAO();
   computeTest();
+  mContext->copyResource(*texScene, *mDevice->backBuffer());
+  mContext->setViewport({vec2::zero, Window::Get()->bounds().size() / 8.f });
+  mainPass();
   mDevice->present();
 }
 
