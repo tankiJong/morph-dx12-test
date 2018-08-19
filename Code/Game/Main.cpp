@@ -21,6 +21,7 @@
 #include "Engine/Math/MathUtils.hpp"
 #include "Engine/Graphics/RHI/RHIBuffer.hpp"
 #include "Engine/Graphics/Program/Program.hpp"
+#include "Engine/Renderer/ImmediateRenderer.hpp"
 
 #define UNUSED(x) (void)x
 
@@ -94,8 +95,8 @@ std::vector<Rgba> genNoise(uint width, uint height) {
 
 S<RHIDevice> mDevice;
 S<RHIContext> mContext;
-GraphicsState::sptr_t GraphicsState;
-RootSignature::sptr_t rootSig;
+// GraphicsState::sptr_t GraphicsState;
+// RootSignature::sptr_t rootSig;
 
 Camera* mCamera;
 light_info_t mLight;
@@ -111,7 +112,7 @@ RHIBuffer::sptr_t cVp;
 RHIBuffer::sptr_t cLight;
 Texture2::sptr_t texture;
 ShaderResourceView::sptr_t texSrv;
-DescriptorSet::sptr_t descriptorSet;
+// DescriptorSet::sptr_t descriptorSet;
 FrameBuffer* frameBuffer;
 
 #define NUM_KERNEL 64
@@ -127,6 +128,7 @@ ConstantBufferView::sptr_t ssaoParamCbv;
 DescriptorSet::sptr_t ssaoDescriptorSet;
 Texture2::sptr_t ssaoMap;
 
+ImmediateRenderer renderer;
 
 RHIBuffer::sptr_t computeVerts;
 //uint elementCount = 0; 
@@ -175,6 +177,7 @@ void Initialize() {
   mDevice = RHIDevice::get();
   mContext = mDevice->defaultRenderContext();
 
+  renderer.startUp();
   uint w = Window::Get()->bounds().width();
   uint h = (uint)Window::Get()->bounds().height();
   texNormal = Texture2::create(
@@ -197,20 +200,20 @@ void Initialize() {
 
   // main pass
   {
-    FrameBuffer::Desc fDesc;
-    fDesc.defineColorTarget(0, TEXTURE_FORMAT_RGBA8);
-    fDesc.defineColorTarget(1, TEXTURE_FORMAT_RGBA8);
-    fDesc.defineDepthTarget(TEXTURE_FORMAT_D24S8);
-    frameBuffer = new FrameBuffer(fDesc);
-    {
-      RootSignature::Desc desc;
-      RootSignature::desc_set_layout_t layout;
-      layout.addRange(DescriptorSet::Type::Cbv, 0, 2, 0);
-      layout.addRange(DescriptorSet::Type::TextureSrv, 0, 1, 0);
-      descriptorSet = DescriptorSet::create(mDevice->gpuDescriptorPool(), layout);
-      desc.addDescriptorSet(layout);
-      rootSig = RootSignature::create(desc);
-    }
+    // FrameBuffer::Desc fDesc;
+    // fDesc.defineColorTarget(0, TEXTURE_FORMAT_RGBA8);
+    // fDesc.defineColorTarget(1, TEXTURE_FORMAT_RGBA8);
+    // fDesc.defineDepthTarget(TEXTURE_FORMAT_D24S8);
+    // frameBuffer = new FrameBuffer(fDesc);
+    // {
+    //   RootSignature::Desc desc;
+    //   RootSignature::desc_set_layout_t layout;
+    //   layout.addRange(DescriptorSet::Type::Cbv, 0, 2, 0);
+    //   layout.addRange(DescriptorSet::Type::TextureSrv, 0, 1, 0);
+    //   descriptorSet = DescriptorSet::create(mDevice->gpuDescriptorPool(), layout);
+    //   desc.addDescriptorSet(layout);
+    //   rootSig = RootSignature::create(desc);
+    // }
     {
       GraphicsState::Desc desc;
 
@@ -219,13 +222,10 @@ void Initialize() {
       prog->stage(SHADER_TYPE_VERTEX).setFromFile(shaderPath, "VSMain");
       prog->stage(SHADER_TYPE_FRAGMENT).setFromFile(shaderPath, "PSMain");
       prog->compile();
-      desc.setProgram(prog);
+      renderer.setProgram(prog);
 
-      desc.setRootSignature(rootSig);
-      desc.setPrimTye(GraphicsState::PrimitiveType::Triangle);
-      desc.setVertexLayout(VertexLayout::For<vertex_lit_t>());
-      desc.setFboDesc(fDesc);
-      GraphicsState = GraphicsState::create(desc);
+
+      // GraphicsState = prog->compile();
     }
 
     Mesher ms;
@@ -247,7 +247,7 @@ void Initialize() {
     light_info_t light;
     light.asSpotLight(mCamera->transfrom().position(), mCamera->transfrom().forward(), 5.f, 10.f, 1.f);
     cLight = RHIBuffer::create(sizeof(light_info_t), RHIResource::BindingFlag::ConstantBuffer, RHIBuffer::CPUAccess::Write,
-                               &light);
+    &light);
     //
     std::vector<UINT8> data = GenerateTextureData();
     texture = Texture2::create(texWidth, texHeight, TEXTURE_FORMAT_RGBA8, RHIResource::BindingFlag::ShaderResource, data.data(), data.size());
@@ -256,9 +256,9 @@ void Initialize() {
     texNoise = Texture2::create(w, h, TEXTURE_FORMAT_RGBA8,
       RHIResource::BindingFlag::ShaderResource,
       noise.data(), w * h * sizeof(Rgba));
-    descriptorSet->setCbv(0, 0, *cVp->cbv());
-    descriptorSet->setCbv(0, 1, *cLight->cbv());
-    descriptorSet->setSrv(1, 0, texture->srv());
+    // descriptorSet->setCbv(0, 0, *cVp->cbv());
+    // descriptorSet->setCbv(0, 1, *cLight->cbv());
+    // descriptorSet->setSrv(1, 0, texture->srv());
     mContext->resourceBarrier(texture.get(), RHIResource::State::ShaderResource);
   }
 
@@ -379,27 +379,35 @@ void mainPass() {
   // if(runAO) {
   // frameBuffer->setColorTarget(texScene, 0);
   // } else {
-  frameBuffer->setColorTarget(mDevice->backBuffer(), 0);
+  renderer.setRenderTarget(&mDevice->backBuffer()->rtv(), 0);
+  renderer.setRenderTarget(&texNormal->rtv(), 1);
+  renderer.setDepthStencilTarget(mDevice->depthBuffer()->dsv());
+  renderer.setTexture(TEXTURE_DIFFUSE, texture->srv());
+  // frameBuffer->setColorTarget(mDevice->backBuffer(), 0);
   // }
-  frameBuffer->setColorTarget(texNormal, 1);
-  frameBuffer->setDepthStencilTarget(mDevice->depthBuffer());
+  // frameBuffer->setColorTarget(texNormal, 1);
 
-  mContext->setFrameBuffer(*frameBuffer);
+  // mContext->setFrameBuffer(*frameBuffer);
   camera_t cameraUbo = mCamera->ubo();
   // cTint->updateData(&color, 0, sizeof(vec4));
   cVp->updateData(&cameraUbo, 0, sizeof(camera_t));
-
   cLight->updateData(&mLight, 0, sizeof(light_info_t));
-  mContext->setGraphicsState(*GraphicsState);
 
-  descriptorSet->bindForGraphics(*mContext, *rootSig, 0);
 
-  for(uint i = 0; i < mesh->mVertices.size(); i ++) {
-    mContext->setVertexBuffer(*mesh->vertices(i), i);
-  }
+  renderer.setLight(0, mLight);
+  // renderer.setView(*mCamera);
+  
+  // mContext->setGraphicsState(*GraphicsState);
+
+  // descriptorSet->bindForGraphics(*mContext, *rootSig, 0);
+
+  // for(uint i = 0; i < mesh->mVertices.size(); i ++) {
+  //   mContext->setVertexBuffer(*mesh->vertices(i), i);
+  // }
   // mContext->setIndexBuffer(*mesh->indices());
-
-  mContext->draw(0, mesh->vertices(0)->elementCount());
+  renderer.setModelMatrix(mat44::identity);
+  renderer.drawMesh(*mesh);
+  // mContext->draw(0, mesh->vertices(0)->elementCount());
   // mContext->draw(3, 3);
   // mContext->afterFrame();
 }
@@ -454,6 +462,7 @@ void render() {
   // SSAO();
   computeTest();
   mContext->copyResource(*texScene, *mDevice->backBuffer());
+  renderer.setView(*mCamera);
   mContext->setViewport({vec2::zero, Window::Get()->bounds().size() / 8.f });
   mainPass();
   mDevice->present();

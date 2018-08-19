@@ -64,12 +64,12 @@ struct light_info_t {
   float4x4 vp;
 };
 
-cbuffer cCamera : register(b0) {
+cbuffer cCamera : register(b1) {
   float4x4 projection;
   float4x4 view;
 };
 
-cbuffer cLight: register(b1) {
+cbuffer cLight: register(b3) {
   light_info_t light;
 }
 
@@ -83,7 +83,7 @@ struct PSInput {
 	float3 eyePosition: PASS_EYE;
 };
 
-Texture2D gTexDiffuse : register(t0);
+Texture2D gTexDiffuse : register(t1);
 SamplerState g_sampler : register(s0);
 
 PSInput VSMain(float3 position : POSITION, float4 color : COLOR, float2 uv : UV, float3 normal : NORMAL, float3 tangent: TANGENT) {
