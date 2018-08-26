@@ -128,18 +128,31 @@ ConstantBufferView::sptr_t ssaoParamCbv;
 DescriptorSet::sptr_t ssaoDescriptorSet;
 Texture2::sptr_t ssaoMap;
 
-ImmediateRenderer renderer;
+ImmediateRenderer* renderer;
 
 RHIBuffer::sptr_t computeVerts;
 //uint elementCount = 0; 
 //uint numVerts = 0;
 
-void buildMeshDataForCompute(vec3* data, uint size) {
+void buildMeshDataForCompute(Mesher& mesher) {
+  uint size = mesher.mVertices.count();
   vec4* loca = (vec4*)_alloca(size * sizeof(vec4));
 
-  for(uint i = 0; i < size; i++) {
-    loca[i] = vec4(data[i], 1.f);
+  float count = mesher.mIns.size();
+  uint i = 0;
+
+  vec3* position = mesher.mVertices.vertices().position;
+  for(uint j = 0; j < count; j++) {
+    for(uint e = 0; e < mesher.mIns[j].elementCount; e++) {
+      loca[i] = vec4(position[i], float(j) / count);
+      i++;
+    }
   }
+
+  loca[0].w = 0;
+  loca[3].w = .25f;
+  loca[6].w = .75f;
+  loca[9].w = 1.f;
 
   computeVerts = RHIBuffer::create(sizeof(vec4) * size, RHIResource::BindingFlag::UnorderedAccess | RHIResource::BindingFlag::ShaderResource, RHIBuffer::CPUAccess::None);
   computeVerts->updateData(loca, 0, sizeof(vec4) * size);
@@ -177,7 +190,7 @@ void Initialize() {
   mDevice = RHIDevice::get();
   mContext = mDevice->defaultRenderContext();
 
-  renderer.startUp();
+  renderer = &ImmediateRenderer::get();
   uint w = Window::Get()->bounds().width();
   uint h = (uint)Window::Get()->bounds().height();
   texNormal = Texture2::create(
@@ -222,7 +235,7 @@ void Initialize() {
       prog->stage(SHADER_TYPE_VERTEX).setFromFile(shaderPath, "VSMain");
       prog->stage(SHADER_TYPE_FRAGMENT).setFromFile(shaderPath, "PSMain");
       prog->compile();
-      renderer.setProgram(prog);
+      renderer->setProgram(prog);
 
 
       // GraphicsState = prog->compile();
@@ -232,14 +245,24 @@ void Initialize() {
 
     ms.begin(DRAW_TRIANGES, false);
     // ms.cube(vec3(30.f, 100.f, 0), vec3(200.f));
-    ms.cube(vec3(0.f, 10.f, 30), vec3(20.f));
-    ms.cube(vec3(-20.f, 15.f, -30), vec3(30.f));
-    ms.quad(vec3::zero, vec3::right, vec3::forward, vec2(300.f));
-    // ms.sphere(vec3(0, 10.f, 0), 10.f, 50, 50);
+    ms.cube(vec3(0.f, 10.f, 0.f), vec3(20.f));
+    ms.cube(vec3(10.f, 5.f, 0.f), vec3(10.f));
+    // ms.cube(vec3(20.f, 7.5f, 20.f), vec3(15.f));
+    ms.quad(vec3(0, -10, 7.f), vec3::right, vec3::up, vec2(40.f));
+    // ms.quad(vec3(-30, 10, 0), -vec3::forward, vec3::up, vec2(20.f));
     ms.end();
+    // ms.begin(DRAW_TRIANGES, false);
+    // ms.cube(vec3(-20.f, 15.f, -30), vec3(30.f));
+    // ms.end();
+    ms.begin(DRAW_TRIANGES, false);
+    ms.quad(vec3::zero, vec3::right, vec3::forward, vec2(300.f));
+    // // ms.sphere(vec3(0, 10.f, 0), 10.f, 15, 15);
+    ms.end();
+
+    buildMeshDataForCompute(ms);
+
     mesh = ms.createMesh<vertex_lit_t>();
 
-    buildMeshDataForCompute(ms.mVertices.vertices().position, ms.mVertices.count());
 
     camera_t cameraUbo = mCamera->ubo();
     cVp = RHIBuffer::create(sizeof(camera_t), RHIResource::BindingFlag::ConstantBuffer, RHIBuffer::CPUAccess::Write, &cameraUbo);
@@ -379,10 +402,10 @@ void mainPass() {
   // if(runAO) {
   // frameBuffer->setColorTarget(texScene, 0);
   // } else {
-  renderer.setRenderTarget(&mDevice->backBuffer()->rtv(), 0);
-  renderer.setRenderTarget(&texNormal->rtv(), 1);
-  renderer.setDepthStencilTarget(mDevice->depthBuffer()->dsv());
-  renderer.setTexture(TEXTURE_DIFFUSE, texture->srv());
+  renderer->setRenderTarget(&mDevice->backBuffer()->rtv(), 0);
+  renderer->setRenderTarget(&texNormal->rtv(), 1);
+  renderer->setDepthStencilTarget(mDevice->depthBuffer()->dsv());
+  renderer->setTexture(TEXTURE_DIFFUSE, texture->srv());
   // frameBuffer->setColorTarget(mDevice->backBuffer(), 0);
   // }
   // frameBuffer->setColorTarget(texNormal, 1);
@@ -394,8 +417,8 @@ void mainPass() {
   cLight->updateData(&mLight, 0, sizeof(light_info_t));
 
 
-  renderer.setLight(0, mLight);
-  // renderer.setView(*mCamera);
+  renderer->setLight(0, mLight);
+  // renderer->setView(*mCamera);
   
   // mContext->setGraphicsState(*GraphicsState);
 
@@ -405,8 +428,8 @@ void mainPass() {
   //   mContext->setVertexBuffer(*mesh->vertices(i), i);
   // }
   // mContext->setIndexBuffer(*mesh->indices());
-  renderer.setModelMatrix(mat44::identity);
-  renderer.drawMesh(*mesh);
+  renderer->setModelMatrix(mat44::identity);
+  renderer->drawMesh(*mesh);
   // mContext->draw(0, mesh->vertices(0)->elementCount());
   // mContext->draw(3, 3);
   // mContext->afterFrame();
@@ -433,6 +456,7 @@ void mainPass() {
 // }
 
 void computeTest() {
+  GPU_FUNCTION_EVENT();
   mContext->resourceBarrier(texScene.get(), RHIResource::State::UnorderedAccess);
   mContext->setComputeState(*computePipelineState);
   computeDescriptorSet->bindForCompute(*mContext, *computeRootSig);
@@ -462,7 +486,7 @@ void render() {
   // SSAO();
   computeTest();
   mContext->copyResource(*texScene, *mDevice->backBuffer());
-  renderer.setView(*mCamera);
+  renderer->setView(*mCamera);
   mContext->setViewport({vec2::zero, Window::Get()->bounds().size() / 8.f });
   mainPass();
   mDevice->present();

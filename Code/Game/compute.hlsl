@@ -75,6 +75,12 @@ struct Ray {
 	float3 direction;
 };
 
+struct Contact {
+	float4 position;
+	float3 normal;
+	float t;
+	bool valid;
+};
 
 Ray GenPrimaryRay(float3 ndc) {
 	Ray ray;
@@ -91,31 +97,26 @@ Ray GenPrimaryRay(float3 ndc) {
 	return ray;
 }
 
-
-struct Contact {
-	float3 position;
-	float4 t;
-	bool valid;
-};
-
-Contact triIntersection(float3 a, float3 b, float3 c, Ray ray) {
+Contact triIntersection(float3 a, float3 b, float3 c, float color, Ray ray) {
 
 	Contact contact;
 
 	float3 ab = b - a;
 	float3 ac = c - a;
-	float3 normal = normalize(cross(ab, ac));
+	float3 normal = normalize(cross(ac, ab));
+	contact.normal = normal;
 
-	contact.valid = dot(normal, ray.direction) > 0;
+	contact.valid = dot(normal, ray.direction) < 0;
 
-	float t = (dot(normal, a) - dot(normal, ray.position)) / dot(normal, ray.direction);
+	float t = (dot(a - ray.position, normal)) / dot(normal, ray.direction);
 	contact.t = t;
-	contact.position = ray.position + t * ray.direction;
+	contact.position.xyz = ray.position + t * ray.direction;
+	contact.position.w = color;
 
-	float3 p = contact.position;
-	contact.valid = contact.valid && dot(cross(b - a, p - a), normal) >= 0;
-	contact.valid = contact.valid && dot(cross(c - b, p - b), normal) >= 0;
-	contact.valid = contact.valid && dot(cross(a - c, p - c), normal) >= 0;
+	float3 p = contact.position.xyz;
+	contact.valid = contact.valid && dot(cross(p - a, b - a), normal) > 0;
+	contact.valid = contact.valid && dot(cross(p - b, c - b), normal) > 0;
+	contact.valid = contact.valid && dot(cross(p - c, a - c), normal) > 0;
 
 	return contact;
 }
@@ -124,8 +125,93 @@ Contact triIntersection(float3 a, float3 b, float3 c, Ray ray) {
 RWTexture2D<float4> Output: register(u0);
 RWStructuredBuffer<float4> cVerts: register(u1);
 
+struct Random {
+	uint value;
+	uint seed;
+};
+
+Random rnd(uint seed)
+{
+	Random re;
+	re.value = seed;
+
+	seed ^= (seed << 13);
+  seed ^= (seed >> 17);
+  seed ^= (seed << 5);
+
+	re.seed = seed;
+	return re;
+}
+
+Ray GenShadowRay(inout uint seed, Contact contact) {
+	float MAX_UINT = 4294967296.0;
+
+	float3 direction = contact.normal;
+
+	Random r = rnd(seed);
+	seed = r.seed;
+	float x = float(r.value) * (1.0f / MAX_UINT)- .5f;
+	 
+	r = rnd(seed);
+	seed = r.seed;
+	float y = float(r.value) * (1.0f / MAX_UINT)- .5f;
+
+	r = rnd(seed);
+	seed = r.seed;
+	float z = float(r.value) * (1.0f / MAX_UINT)- .5f;
+
+	float3 right = float3(.33f, .33f, .33f) + float3(x,y,z);
+	float3 _tan = normalize(right);
+	float3 bitan = cross(_tan, contact.normal);
+	float3 tan = cross(bitan, contact.normal);
+
+	float3x3 tbn = transpose(float3x3(tan, contact.normal, bitan));
+
+	r = rnd(seed);
+	seed = r.seed;
+	float b = abs(float(r.value) * (1.0f / MAX_UINT) - .5f) + .001f;
+
+	r = rnd(seed);
+	seed = r.seed;
+	float a = float(r.value) * (1.0f / MAX_UINT)- .5f;
+
+	r = rnd(seed);
+	seed = r.seed;
+	float c = float(r.value) * (1.0f / MAX_UINT) - .5f;
+	
+	float3 sample = normalize(mul(tbn, float3(a,b,c)));
+
+	Ray ray;
+
+	ray.direction = sample;
+	ray.position = contact.position.xyz + contact.normal * 0.01f;
+
+	return ray;
+}
+
+Contact trace(Ray ray) {
+	uint vertCount, stride;
+	cVerts.GetDimensions(vertCount, stride);
+
+	Contact contact;
+	contact.t = 1e6;
+	contact.valid = false;
+
+	for(uint i = 0; i < vertCount; i+=3) {
+		Contact c = triIntersection(cVerts[i].xyz, cVerts[i+1].xyz, cVerts[i+2].xyz, cVerts[i].w, ray);
+		bool valid = c.valid && (c.t < contact.t) && (c.t > 0.001f);	 // third is bias prevent from hitting self
+		if(valid)	{
+			contact = c;
+		}
+	}
+
+	return contact;
+}
+
+static uint SSeed;
+
 [numthreads(32, 32, 1)]
-void main( uint3 threadId : SV_DispatchThreadID )
+void main( uint3 threadId : SV_DispatchThreadID, uint groupIndex: SV_GroupIndex)
 {
 
 	uint2 pix = threadId.xy;
@@ -139,35 +225,48 @@ void main( uint3 threadId : SV_DispatchThreadID )
 	ndcxy = ndcxy * 2.f - 1.f;
 	float3 ndc = float3(ndcxy, 0.f);
 
-	Ray ray = GenPrimaryRay(ndc);
+	Ray primRay = GenPrimaryRay(ndc);
 
-	uint vertCount, stride;
-	cVerts.GetDimensions(vertCount, stride);
+	Contact contact = trace(primRay);
+	
+	// now contact is the first intersect position
+	// next spawn shadow ray and see whether it can hit the light
 
-	Contact contact;
-	contact.t = 1e6;
-	contact.valid = false;
+	float occlusion = 0;
 
+	uint original;
+	SSeed = threadId.x * 1024 + threadId.y + groupIndex;
 
-	uint i = 0;
-	for(; i < vertCount; i+=3) {
-		Contact c = triIntersection(cVerts[i].xyz, cVerts[i+1].xyz, cVerts[i+2].xyz, ray);
-		bool valid = c.valid && (c.t < contact.t);
-		if(valid)	{
-			contact = c;
+	for(uint i = 0; i < 2; i++) {
+		Ray ray = GenShadowRay(SSeed, contact);
+		//ray.direction = float3(-0.5f, 0.5f, 0.f);
+		if(dot(ray.direction, contact.normal) > 0 ) {
+			Output[threadId.xy] = float4(1, 1, 1, 1.f);
+		}	else {
+			Output[threadId.xy] = float4(0, 0, 0, 1.f);
 		}
-	} 
 
+		Contact c = trace(ray);
+
+		bool occluded = c.valid;
+		if(occluded) {
+			// Output[threadId.xy] = float4(contact.position.w,contact.position.w,contact.position.w, 1.f);
+
+			occlusion+= dot(contact.normal, ray.direction) / (c.t + 1.f);
+		}
+	}
+	 		 
+	occlusion = occlusion / 2.f;
+	occlusion = 1.f - occlusion;
+	/*	
 	if(contact.valid) {
-		float4 world = float4(contact.position, 1.f);
+		float4 world = float4(contact.position.xyz, 1.f);
 		float4 clip = mul(projection, mul(view, world));
 
 		float3 ndc = clip.xyz / clip.w;
-
-		Output[threadId.xy] = float4(.5, .5, .5, 1.f);
-	}
-
-  // float2 cc =projection[0].xy * 0.f + light.position.xy * 0.f + cVerts[0].xy * 0.f; 
-	// Output[threadId.xy] = float4(threadId.xy % 32 / 32.f + cc, 1.f, 1.f);
+		*/
+		float3 color = float3(occlusion, occlusion, occlusion);
+		Output[threadId.xy] = float4(color, 1.f);
+	// }					
 }
 
